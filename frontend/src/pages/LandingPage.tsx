@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Shield, Bell } from "lucide-react";
+import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/clerk-react";
 import heroImage from "@/assets/hero-carpool.jpg";
 
 const LandingPage = () => {
+  const { isSignedIn } = useUser();
+  
   const features = [
     {
       icon: Users,
@@ -32,13 +35,28 @@ const LandingPage = () => {
               CabPro
             </h1>
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="default">
-                Sign In
-              </Button>
-              
-              <Button variant="default" size="default">
-                Sign Up
-              </Button>
+              {isSignedIn ? (
+                <UserButton 
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8"
+                    }
+                  }}
+                />
+              ) : (
+                <>
+                  <SignInButton mode="modal">
+                    <Button variant="outline" size="default">
+                      Sign In
+                    </Button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <Button variant="default" size="default">
+                      Sign Up
+                    </Button>
+                  </SignUpButton>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -60,12 +78,23 @@ const LandingPage = () => {
                 Save money, reduce traffic, and ride together. Join thousands of commuters making smarter travel choices every day.
               </p>
               <div className="flex gap-4 justify-center md:justify-start">
-                <Button 
-                  size="lg" 
-                  className="text-lg px-8 shadow-lg hover:shadow-xl transition-all duration-300"
-                >
-                  Get Started
-                </Button>
+                {isSignedIn ? (
+                  <Button 
+                    size="lg" 
+                    className="text-lg px-8 shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    Go to Dashboard
+                  </Button>
+                ) : (
+                  <SignUpButton mode="modal">
+                    <Button 
+                      size="lg" 
+                      className="text-lg px-8 shadow-lg hover:shadow-xl transition-all duration-300"
+                    >
+                      Get Started
+                    </Button>
+                  </SignUpButton>
+                )}
                 <Button 
                   size="lg" 
                   variant="outline"
@@ -137,9 +166,17 @@ const LandingPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
-              <Button size="lg" className="text-lg px-12">
-                Sign Up Now
-              </Button>
+              {isSignedIn ? (
+                <Button size="lg" className="text-lg px-12">
+                  Go to Dashboard
+                </Button>
+              ) : (
+                <SignUpButton mode="modal">
+                  <Button size="lg" className="text-lg px-12">
+                    Sign Up Now
+                  </Button>
+                </SignUpButton>
+              )}
             </CardContent>
           </Card>
         </div>
