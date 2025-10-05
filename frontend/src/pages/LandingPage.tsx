@@ -2,10 +2,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Shield, Bell } from "lucide-react";
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 import heroImage from "@/assets/hero-carpool.jpg";
 
 const LandingPage = () => {
   const { isSignedIn } = useUser();
+  const navigate = useNavigate();
   
   const features = [
     {
@@ -45,12 +47,12 @@ const LandingPage = () => {
                 />
               ) : (
                 <>
-                  <SignInButton mode="modal">
+                  <SignInButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
                     <Button variant="outline" size="default">
                       Sign In
                     </Button>
                   </SignInButton>
-                  <SignUpButton mode="modal">
+                  <SignUpButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
                     <Button variant="default" size="default">
                       Sign Up
                     </Button>
@@ -82,11 +84,12 @@ const LandingPage = () => {
                   <Button 
                     size="lg" 
                     className="text-lg px-8 shadow-lg hover:shadow-xl transition-all duration-300"
+                    onClick={() => navigate("/dashboard")}
                   >
                     Go to Dashboard
                   </Button>
                 ) : (
-                  <SignUpButton mode="modal">
+                  <SignUpButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
                     <Button 
                       size="lg" 
                       className="text-lg px-8 shadow-lg hover:shadow-xl transition-all duration-300"
@@ -167,11 +170,11 @@ const LandingPage = () => {
             </CardHeader>
             <CardContent className="flex justify-center pb-8">
               {isSignedIn ? (
-                <Button size="lg" className="text-lg px-12">
+                <Button size="lg" className="text-lg px-12" onClick={() => navigate("/dashboard")}>
                   Go to Dashboard
                 </Button>
               ) : (
-                <SignUpButton mode="modal">
+                <SignUpButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
                   <Button size="lg" className="text-lg px-12">
                     Sign Up Now
                   </Button>
