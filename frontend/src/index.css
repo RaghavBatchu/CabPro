@@ -43,6 +43,14 @@ All colors MUST be HSL.
     --shadow-card: 0 4px 20px -2px hsl(201 96% 32% / 0.1);
     --shadow-hover: 0 8px 30px -4px hsl(201 96% 32% / 0.2);
 
+    /* UI tokens for Dashboard cards */
+    --ride-card-hover: 210 40% 97%;
+    --status-full: 0 84% 60%;
+    --status-available: 142 71% 45%;
+    --gender-male: 201 96% 32%;
+    --gender-female: 338 78% 55%;
+    --gender-any: 210 40% 50%;
+
     --sidebar-background: 0 0% 98%;
 
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -93,6 +101,12 @@ All colors MUST be HSL.
     --gradient-card: linear-gradient(145deg, hsl(217 33% 17%), hsl(222 47% 11%));
     --shadow-card: 0 4px 20px -2px hsl(0 0% 0% / 0.3);
     --shadow-hover: 0 8px 30px -4px hsl(188 94% 42% / 0.3);
+    --ride-card-hover: 217 33% 19%;
+    --status-full: 0 63% 31%;
+    --status-available: 142 71% 35%;
+    --gender-male: 188 94% 42%;
+    --gender-female: 338 78% 55%;
+    --gender-any: 215 20% 65%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -111,5 +125,31 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Primary filled button used in actions */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  /* Generic card look used across the app */
+  .ride-card {
+    @apply rounded-lg border border-border bg-card p-5 shadow-sm transition-shadow;
+    box-shadow: var(--shadow-card);
+  }
+  .ride-card:hover {
+    box-shadow: var(--shadow-hover);
+  }
+
+  /* Small rounded badge for statuses */
+  .status-badge {
+    @apply rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  /* Filters container styling to match screenshot */
+  .filter-section {
+    @apply rounded-lg border border-border bg-secondary/40 p-6;
   }
 }

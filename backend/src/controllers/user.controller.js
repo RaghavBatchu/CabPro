@@ -23,6 +23,22 @@ export const getUser = async (req, res) => {
   }
 };
 
+// @desc Get a single user by personalEmail
+// @route GET /api/users/by-email?personalEmail=...
+export const getUserByEmail = async (req, res) => {
+  try {
+    const { personalEmail } = req.query;
+    if (!personalEmail) {
+      return res.status(400).json({ message: "personalEmail query param is required" });
+    }
+    const user = await User.findOne({ personalEmail: String(personalEmail).toLowerCase() });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch user", error: error.message });
+  }
+};
+
 // @desc Create a new user
 // @route POST /api/users
 export const createUser = async (req, res) => {

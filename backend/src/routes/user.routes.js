@@ -5,13 +5,15 @@ import {
     createUser, 
     updateUser, 
     deleteUser,
-    checkUserExists
+    checkUserExists,
+    getUserByEmail
 } from "../controllers/user.controller.js";
 
 const userRouter = Router();
 
 userRouter.get("/", getUsers);
 userRouter.get("/:id", getUser);
+userRouter.get("/by-email/find", getUserByEmail);
 userRouter.post("/", createUser);
 userRouter.put("/:id", updateUser);
 userRouter.delete("/:id", deleteUser);
