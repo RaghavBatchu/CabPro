@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RideCard } from "@/components/RideCard";
-import { mockRides, mockUser, Ride } from "@/components/data/mockData";
+import { CreateRideModal } from "@/components/CreateRideModal";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -8,97 +10,173 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
+import { fetchRides, joinRide, leaveRide, Ride, RideFilters } from "@/services/rideApi";
+import { useUser } from "@clerk/clerk-react";
+import { fetchUserByEmail } from "@/services/userApi";
 
 const Dashboard = () => {
-  const [rides, setRides] = useState<Ride[]>(mockRides);
+  const { user } = useUser();
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [originFilter, setOriginFilter] = useState<string>("all");
   const [destinationFilter, setDestinationFilter] = useState<string>("all");
-  const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("");
+  const [timeFilter, setTimeFilter] = useState<string>("");
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
 
-  const destinations = Array.from(new Set(mockRides.map((r) => r.destination)));
+  const origins = Array.from(new Set(rides.map((r) => r.origin)));
+  const destinations = Array.from(new Set(rides.map((r) => r.destination)));
 
-  const filteredRides = rides.filter((ride) => {
-    if (destinationFilter !== "all" && ride.destination !== destinationFilter)
-      return false;
-    if (timeFilter !== "all") {
-      const hour = parseInt(ride.time.split(":")[0]);
-      if (timeFilter === "morning" && (hour < 6 || hour >= 12)) return false;
-      if (timeFilter === "afternoon" && (hour < 12 || hour >= 18)) return false;
-      if (timeFilter === "evening" && (hour < 18 || hour >= 24)) return false;
-    }
-    if (genderFilter !== "all" && ride.genderPreference !== genderFilter)
-      return false;
-    if (seatsFilter !== "all") {
-      const seats = parseInt(seatsFilter);
-      if (ride.availableSeats < seats) return false;
-    }
-    return true;
-  });
-
-  const handleJoinRide = (rideId: string) => {
-    setRides((prev) =>
-      prev.map((ride) => {
-        if (ride.id === rideId && ride.availableSeats > 0) {
-          toast.success("Joined ride successfully!");
-          return {
-            ...ride,
-            availableSeats: ride.availableSeats - 1,
-            participants: [...ride.participants, mockUser.id],
-          };
+  // Load user data and rides
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        
+        // Load user data
+        if (user?.primaryEmailAddress?.emailAddress) {
+          const userInfo = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+          setUserData(userInfo);
         }
-        return ride;
-      })
-    );
+
+        // Load rides with current filters
+        const filters: RideFilters = {};
+        if (originFilter !== "all") filters.origin = originFilter;
+        if (destinationFilter !== "all") filters.destination = destinationFilter;
+        if (dateFilter) filters.date = dateFilter;
+        if (timeFilter) filters.time = timeFilter;
+        if (genderFilter !== "all") filters.genderPreference = genderFilter;
+        if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+
+        const ridesData = await fetchRides(filters);
+        setRides(ridesData);
+      } catch (error) {
+        console.error("Failed to load data:", error);
+        toast.error("Failed to load rides");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
+
+  const filteredRides = rides;
+
+  const handleJoinRide = async (rideId: string) => {
+    if (!userData) {
+      toast.error("User data not available");
+      return;
+    }
+
+    try {
+      const updatedRide = await joinRide(rideId, userData._id);
+      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
+      toast.success("Joined ride successfully!");
+    } catch (error: any) {
+      console.error("Failed to join ride:", error);
+      toast.error(error.message || "Failed to join ride");
+    }
   };
 
-  const handleLeaveRide = (rideId: string) => {
-    setRides((prev) =>
-      prev.map((ride) => {
-        if (ride.id === rideId && ride.participants.includes(mockUser.id)) {
-          toast.info("Left ride successfully");
-          return {
-            ...ride,
-            availableSeats: ride.availableSeats + 1,
-            participants: ride.participants.filter((p) => p !== mockUser.id),
-          };
-        }
-        return ride;
-      })
-    );
+  const handleLeaveRide = async (rideId: string) => {
+    if (!userData) {
+      toast.error("User data not available");
+      return;
+    }
+
+    try {
+      const updatedRide = await leaveRide(rideId, userData._id);
+      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
+      toast.info("Left ride successfully");
+    } catch (error: any) {
+      console.error("Failed to leave ride:", error);
+      toast.error(error.message || "Failed to leave ride");
+    }
   };
 
-  const handleRemoveParticipant = (rideId: string, participantId: string) => {
-    setRides((prev) =>
-      prev.map((ride) => {
-        if (ride.id === rideId) {
-          toast.info("Participant removed");
-          return {
-            ...ride,
-            availableSeats: ride.availableSeats + 1,
-            participants: ride.participants.filter((p) => p !== participantId),
-          };
-        }
-        return ride;
-      })
-    );
+  const handleRemoveParticipant = async (rideId: string, participantId: string) => {
+    try {
+      const updatedRide = await leaveRide(rideId, participantId);
+      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
+      toast.info("Participant removed");
+    } catch (error: any) {
+      console.error("Failed to remove participant:", error);
+      toast.error(error.message || "Failed to remove participant");
+    }
+  };
+
+  const handleRideCreated = () => {
+    // Reload rides after creating a new one
+    const loadRides = async () => {
+      try {
+        const filters: RideFilters = {};
+        if (originFilter !== "all") filters.origin = originFilter;
+        if (destinationFilter !== "all") filters.destination = destinationFilter;
+        if (dateFilter) filters.date = dateFilter;
+        if (timeFilter) filters.time = timeFilter;
+        if (genderFilter !== "all") filters.genderPreference = genderFilter;
+        if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+
+        const ridesData = await fetchRides(filters);
+        setRides(ridesData);
+      } catch (error) {
+        console.error("Failed to reload rides:", error);
+      }
+    };
+    loadRides();
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Available Rides
-        </h1>
-        <p className="text-muted-foreground">
-          Find and join rides that match your schedule
-        </p>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Available Rides
+            </h1>
+            <p className="text-muted-foreground">
+              Find and join rides that match your schedule
+            </p>
+          </div>
+          <Button 
+            onClick={() => setShowCreateModal(true)}
+            className="btn-primary"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Ride
+          </Button>
+        </div>
       </div>
 
       <div className="filter-section mb-8">
         <h2 className="text-lg font-semibold text-foreground mb-4">Filters</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block">
+              From
+            </label>
+            <Select value={originFilter} onValueChange={setOriginFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All origins" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All origins</SelectItem>
+                {origins.map((origin) => (
+                  <SelectItem key={origin} value={origin}>
+                    {origin}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
               Destination
@@ -120,19 +198,24 @@ const Dashboard = () => {
 
           <div>
             <label className="text-sm font-medium text-foreground mb-2 block">
-              Time Range
+              Date
             </label>
-            <Select value={timeFilter} onValueChange={setTimeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All times" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All times</SelectItem>
-                <SelectItem value="morning">Morning (6AM-12PM)</SelectItem>
-                <SelectItem value="afternoon">Afternoon (12PM-6PM)</SelectItem>
-                <SelectItem value="evening">Evening (6PM-12AM)</SelectItem>
-              </SelectContent>
-            </Select>
+            <DatePicker
+              value={dateFilter}
+              onChange={setDateFilter}
+              placeholder="Select date"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block">
+              Time
+            </label>
+            <TimePicker
+              value={timeFilter}
+              onChange={setTimeFilter}
+              placeholder="Select time"
+            />
           </div>
 
           <div>
@@ -173,12 +256,16 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRides.length > 0 ? (
+        {loading ? (
+          <div className="col-span-full text-center py-12">
+            <p className="text-lg text-muted-foreground">Loading rides...</p>
+          </div>
+        ) : filteredRides.length > 0 ? (
           filteredRides.map((ride) => (
             <RideCard
-              key={ride.id}
+              key={ride._id}
               ride={ride}
-              currentUserId={mockUser.id}
+              currentUserId={userData?._id}
               onJoinRide={handleJoinRide}
               onLeaveRide={handleLeaveRide}
               onRemoveParticipant={handleRemoveParticipant}
@@ -186,12 +273,31 @@ const Dashboard = () => {
           ))
         ) : (
           <div className="col-span-full text-center py-12">
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-muted-foreground mb-4">
               No rides match your filters
             </p>
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your Own Ride
+            </Button>
           </div>
         )}
       </div>
+
+      <CreateRideModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onRideCreated={handleRideCreated}
+        initialFilters={{
+          origin: originFilter !== "all" ? originFilter : undefined,
+          destination: destinationFilter !== "all" ? destinationFilter : undefined,
+          date: dateFilter || undefined,
+          time: timeFilter || undefined,
+        }}
+      />
     </div>
   );
 };

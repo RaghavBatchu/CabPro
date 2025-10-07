@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { mockReviews, Review } from "@/components/data/mockData";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,34 +7,85 @@ import { Textarea } from "@/components/ui/textarea";
 import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { fetchReviews, createReview, Review } from "@/services/reviewApi";
+import { fetchUserByEmail } from "@/services/userApi";
+import { useUser } from "@clerk/clerk-react";
 
 const Reviews = () => {
-  const [reviews, setReviews] = useState<Review[]>(mockReviews);
+  const { user } = useUser();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [totalReviews, setTotalReviews] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [newReview, setNewReview] = useState({
     reviewerName: "",
     rating: 0,
     comment: "",
   });
 
-  const averageRating =
-    reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  // Load reviews from backend
+  useEffect(() => {
+    const loadReviews = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchReviews();
+        setReviews(data.reviews);
+        setAverageRating(parseFloat(data.average));
+        setTotalReviews(data.total);
+      } catch (error) {
+        console.error("Failed to load reviews:", error);
+        toast.error("Failed to load reviews");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadReviews();
+  }, []);
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  // Auto-populate user name
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (user?.primaryEmailAddress?.emailAddress) {
+        try {
+          const userData = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+          setNewReview(prev => ({ ...prev, reviewerName: userData.fullName }));
+        } catch (error) {
+          console.error("Failed to load user data:", error);
+        }
+      }
+    };
+    loadUserData();
+  }, [user]);
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newReview.reviewerName && newReview.rating > 0 && newReview.comment) {
-      const review: Review = {
-        id: `review${reviews.length + 1}`,
-        rideId: "ride1",
-        reviewerName: newReview.reviewerName,
+    if (!newReview.reviewerName || newReview.rating === 0 || !newReview.comment) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await createReview({
+        name: newReview.reviewerName,
         rating: newReview.rating,
         comment: newReview.comment,
-        date: new Date().toISOString().split("T")[0],
-      };
-      setReviews([review, ...reviews]);
+      });
+      
+      // Refresh reviews to get updated data
+      const data = await fetchReviews();
+      setReviews(data.reviews);
+      setAverageRating(parseFloat(data.average));
+      setTotalReviews(data.total);
+      
       setNewReview({ reviewerName: "", rating: 0, comment: "" });
       toast.success("Review submitted successfully!");
-    } else {
-      toast.error("Please fill in all fields");
+    } catch (error) {
+      console.error("Failed to submit review:", error);
+      toast.error("Failed to submit review");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -54,11 +104,11 @@ const Reviews = () => {
           <Star
             key={star}
             className={cn(
-              "h-5 w-5 transition-[var(--transition-smooth)]",
+              "h-5 w-5 transition-all duration-200",
               star <= rating
-                ? "fill-secondary text-secondary"
-                : "fill-none text-muted-foreground",
-              interactive && "cursor-pointer hover:scale-110"
+                ? "fill-yellow-400 text-yellow-400"
+                : "fill-none text-gray-300",
+              interactive && "cursor-pointer hover:scale-110 hover:text-yellow-300"
             )}
             onClick={() => interactive && onRate && onRate(star)}
           />
@@ -84,7 +134,7 @@ const Reviews = () => {
             </div>
             <StarRating rating={Math.round(averageRating)} />
             <p className="text-sm text-muted-foreground mt-2">
-              Based on {reviews.length} reviews
+              Based on {totalReviews} reviews
             </p>
           </CardContent>
         </Card>
@@ -129,8 +179,8 @@ const Reviews = () => {
                 />
               </div>
 
-              <Button type="submit" className="btn-primary w-full">
-                Submit Review
+              <Button type="submit" className="btn-primary w-full" disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit Review"}
               </Button>
             </form>
           </CardContent>
@@ -139,22 +189,34 @@ const Reviews = () => {
 
       <div className="space-y-4">
         <h2 className="text-2xl font-bold text-foreground">All Reviews</h2>
-        {reviews.map((review) => (
-          <Card key={review.id} className="ride-card">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-foreground">
-                    {review.reviewerName}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">{review.date}</p>
+        {loading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Loading reviews...</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No reviews yet. Be the first to share your experience!</p>
+          </div>
+        ) : (
+          reviews.map((review) => (
+            <Card key={review._id} className="ride-card">
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-foreground">
+                      {review.name}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <StarRating rating={review.rating} />
                 </div>
-                <StarRating rating={review.rating} />
-              </div>
-              <p className="text-card-foreground">{review.comment}</p>
-            </CardContent>
-          </Card>
-        ))}
+                <p className="text-card-foreground">{review.comment}</p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

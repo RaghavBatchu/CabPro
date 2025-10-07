@@ -1,9 +1,11 @@
-export interface Ride {
+  export interface Ride {
     id: string;
     driverName: string;
     driverId: string;
+    origin: string;
     destination: string;
     time: string;
+    date: string;
     availableSeats: number;
     totalSeats: number;
     genderPreference: "Male" | "Female" | "Any";
@@ -42,8 +44,10 @@ export interface Ride {
       id: "ride1",
       driverName: "Sarah Williams",
       driverId: "driver1",
+      origin: "Main Campus",
       destination: "Downtown Campus",
       time: "08:00 AM",
+      date: "2024-12-15",
       availableSeats: 2,
       totalSeats: 4,
       genderPreference: "Any",
@@ -54,8 +58,10 @@ export interface Ride {
       id: "ride2",
       driverName: "Mike Chen",
       driverId: "driver2",
+      origin: "Student Housing",
       destination: "North Library",
       time: "09:30 AM",
+      date: "2024-12-15",
       availableSeats: 1,
       totalSeats: 3,
       genderPreference: "Male",
@@ -66,8 +72,10 @@ export interface Ride {
       id: "ride3",
       driverName: "Emily Davis",
       driverId: "driver3",
+      origin: "East Campus",
       destination: "South Dorms",
       time: "02:00 PM",
+      date: "2024-12-16",
       availableSeats: 3,
       totalSeats: 4,
       genderPreference: "Female",
@@ -78,8 +86,10 @@ export interface Ride {
       id: "ride4",
       driverName: "Alex Johnson",
       driverId: "user1",
+      origin: "Downtown Campus",
       destination: "Airport",
       time: "06:00 PM",
+      date: "2024-12-16",
       availableSeats: 4,
       totalSeats: 4,
       genderPreference: "Any",
@@ -90,8 +100,10 @@ export interface Ride {
       id: "ride5",
       driverName: "Jessica Lee",
       driverId: "driver5",
+      origin: "North Library",
       destination: "Shopping Mall",
       time: "11:00 AM",
+      date: "2024-12-17",
       availableSeats: 0,
       totalSeats: 3,
       genderPreference: "Any",
@@ -102,8 +114,10 @@ export interface Ride {
       id: "ride6",
       driverName: "David Martinez",
       driverId: "driver6",
+      origin: "Student Housing",
       destination: "Downtown Campus",
       time: "07:30 AM",
+      date: "2024-12-17",
       availableSeats: 2,
       totalSeats: 4,
       genderPreference: "Male",

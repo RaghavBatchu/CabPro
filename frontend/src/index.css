@@ -152,4 +152,13 @@ All colors MUST be HSL.
   .filter-section {
     @apply rounded-lg border border-border bg-secondary/40 p-6;
   }
+
+  /* Hide scrollbars for time picker */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
