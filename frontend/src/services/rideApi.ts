@@ -130,3 +130,4 @@ export async function deleteRide(rideId: string): Promise<void> {
     throw err;
   }
 }
+

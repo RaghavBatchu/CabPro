@@ -223,3 +223,4 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     </div>
   );
 };
+
