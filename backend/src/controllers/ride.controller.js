@@ -1,4 +1,5 @@
 import Ride from "../models/ride.model.js";
+import User from "../models/user.model.js";
 
 // @desc    Get all rides (with filters)
 // @route   GET /api/rides
@@ -16,7 +17,22 @@ export const getRides = async (req, res) => {
     if (time) filter.time = time;
 
     const rides = await Ride.find(filter).sort({ date: 1, time: 1 });
-    res.status(200).json(rides);
+
+    // Enrich rides with participant details for leader view on frontend
+    const enrichedRides = await Promise.all(
+      rides.map(async (ride) => {
+        const participants = ride.participants || [];
+        const users = participants.length
+          ? await User.find({ _id: { $in: participants } }).select(
+              "fullName whatsappNumber"
+            )
+          : [];
+        const rideObj = ride.toObject();
+        return { ...rideObj, participantsInfo: users };
+      })
+    );
+
+    res.status(200).json(enrichedRides);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch rides", error: error.message });
   }
@@ -68,7 +84,13 @@ export const getRideById = async (req, res) => {
   try {
     const ride = await Ride.findById(req.params.id);
     if (!ride) return res.status(404).json({ message: "Ride not found" });
-    res.status(200).json(ride);
+    const users = ride.participants.length
+      ? await User.find({ _id: { $in: ride.participants } }).select(
+          "fullName whatsappNumber"
+        )
+      : [];
+    const rideObj = ride.toObject();
+    res.status(200).json({ ...rideObj, participantsInfo: users });
   } catch (error) {
     res.status(500).json({ message: "Failed to get ride", error: error.message });
   }
@@ -90,7 +112,13 @@ export const joinRide = async (req, res) => {
     ride.availableSeats -= 1;
     await ride.save();
 
-    res.status(200).json(ride);
+    const users = ride.participants.length
+      ? await User.find({ _id: { $in: ride.participants } }).select(
+          "fullName whatsappNumber"
+        )
+      : [];
+    const rideObj = ride.toObject();
+    res.status(200).json({ ...rideObj, participantsInfo: users });
   } catch (error) {
     res.status(500).json({ message: "Failed to join ride", error: error.message });
   }
@@ -110,7 +138,13 @@ export const leaveRide = async (req, res) => {
     ride.availableSeats += 1;
     await ride.save();
 
-    res.status(200).json(ride);
+    const users = ride.participants.length
+      ? await User.find({ _id: { $in: ride.participants } }).select(
+          "fullName whatsappNumber"
+        )
+      : [];
+    const rideObj = ride.toObject();
+    res.status(200).json({ ...rideObj, participantsInfo: users });
   } catch (error) {
     res.status(500).json({ message: "Failed to leave ride", error: error.message });
   }

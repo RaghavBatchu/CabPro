@@ -13,6 +13,7 @@ export interface Ride {
   totalSeats: number;
   availableSeats: number;
   participants: string[];
+  participantsInfo?: Array<{ _id: string; fullName: string; whatsappNumber: string }>;
   createdAt: string;
   updatedAt: string;
 }
