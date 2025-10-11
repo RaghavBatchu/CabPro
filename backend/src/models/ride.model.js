@@ -57,4 +57,12 @@ const rideSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Add indexes for better query performance
+rideSchema.index({ origin: 1, destination: 1 });
+rideSchema.index({ date: 1, time: 1 });
+rideSchema.index({ genderPreference: 1 });
+rideSchema.index({ availableSeats: 1 });
+rideSchema.index({ driverId: 1 });
+rideSchema.index({ participants: 1 });
+
 export default mongoose.model("Ride", rideSchema);

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { Car, User, Star } from "lucide-react";
+import { Car, User, Star, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Navigation = () => {
@@ -7,6 +7,7 @@ export const Navigation = () => {
     { path: "/dashboard", label: "Dashboard", icon: Car },
     { path: "/profile", label: "Profile", icon: User },
     { path: "/reviews", label: "Reviews", icon: Star },
+    { path: "/ride-history", label: "Ride History", icon: History },
   ];
 
   return (

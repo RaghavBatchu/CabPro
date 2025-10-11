@@ -36,8 +36,20 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     };
   }, [isOpen]);
   
-  const today = new Date();
-  const selectedDate = value ? new Date(value) : null;
+  // parse value (YYYY-MM-DD) into local Date (avoid Date("YYYY-MM-DD") which creates UTC)
+  const parseYmd = (ymd: string) => {
+    const parts = ymd.split('-').map(Number);
+    if (parts.length === 3) return new Date(parts[0], parts[1] - 1, parts[2]);
+    return new Date(ymd);
+  };
+  const selectedDate = value ? parseYmd(value) : null;
+
+  // keep calendar showing selected date's month when value changes
+  useEffect(() => {
+    if (selectedDate) {
+      setCurrentMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    }
+  }, [value]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -70,9 +82,16 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     });
   };
 
+  const formatYmd = (date: Date) => {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   const handleDateSelect = (day: number) => {
-    const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    onChange(selectedDate.toISOString().split('T')[0]);
+    const selected = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    onChange(formatYmd(selected));
     setIsOpen(false);
   };
 
@@ -98,6 +117,17 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     if (!selectedDate) return false;
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
     return date.toDateString() === selectedDate.toDateString();
+  };
+
+  const isBeforeToday = (day: number) => {
+    if (!day) return false;
+    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+    // compare dates by ymd
+    const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const todayYmd = ymd(new Date());
+    const targetYmd = ymd(date);
+    // If target is earlier than today
+    return new Date(targetYmd) < new Date(todayYmd);
   };
 
   const days = getDaysInMonth(currentMonth);
@@ -155,24 +185,28 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           </div>
 
           <div className="grid grid-cols-7 gap-1">
-            {days.map((day, index) => (
-              <Button
-                key={index}
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "h-8 w-8 p-0",
-                  day && isToday(day) && "bg-primary/10 text-primary font-semibold",
-                  day && isSelected(day) && "bg-primary text-primary-foreground",
-                  day && !isToday(day) && !isSelected(day) && "hover:bg-accent"
-                )}
-                onClick={() => day && handleDateSelect(day)}
-                disabled={!day}
-              >
-                {day}
-              </Button>
-            ))}
+            {days.map((day, index) => {
+              const disabled = !day || isBeforeToday(day);
+              return (
+                <Button
+                  key={index}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-8 w-8 p-0",
+                    disabled && "opacity-50 cursor-not-allowed",
+                    day && isToday(day) && "bg-primary/10 text-primary font-semibold",
+                    day && isSelected(day) && "bg-primary text-primary-foreground",
+                    day && !isToday(day) && !isSelected(day) && !disabled && "hover:bg-accent"
+                  )}
+                  onClick={() => !disabled && day && handleDateSelect(day)}
+                  disabled={disabled}
+                >
+                  {day}
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}

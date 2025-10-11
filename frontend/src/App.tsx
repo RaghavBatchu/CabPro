@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import PostAuth from "./pages/PostAuth";
 import Profile from "./pages/Profile";
 import Reviews from "./pages/Reviews";
+import RideHistory from "./pages/RideHistory";
 import { Navigation } from "./components/Navbar";
 import { SignedIn } from "@clerk/clerk-react";
 import RequireProfile from "./components/RequireProfile";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/dashboard" element={<SignedIn><><Navigation /><RequireProfile><Dashboard /></RequireProfile></></SignedIn>} />
               <Route path="/profile" element={<SignedIn><><Navigation /><RequireProfile><Profile /></RequireProfile></></SignedIn>} />
               <Route path="/reviews" element={<SignedIn><><Navigation /><RequireProfile><Reviews /></RequireProfile></></SignedIn>} />
+              <Route path="/ride-history" element={<SignedIn><><Navigation /><RequireProfile><RideHistory /></RequireProfile></></SignedIn>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

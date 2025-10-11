@@ -43,11 +43,20 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     phone: "",
   });
 
+  const todayYmd = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
   React.useEffect(() => {
-    if (isOpen && user?.primaryEmailAddress?.emailAddress) {
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (isOpen && email) {
       const loadUserData = async () => {
         try {
-          const data = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+          const data = await fetchUserByEmail(email);
           setUserData(data);
           setFormData(prev => ({
             ...prev,
@@ -59,7 +68,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
       };
       loadUserData();
     }
-  }, [isOpen, user]);
+  }, [isOpen, user?.primaryEmailAddress?.emailAddress]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +160,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                   value={formData.time}
                   onChange={(time) => setFormData(prev => ({ ...prev, time }))}
                   placeholder="Select time"
+                  disablePast={formData.date === todayYmd}
                 />
               </div>
 

@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 export interface Ride {
   _id: string;
@@ -37,6 +37,7 @@ export interface RideFilters {
   time?: string;
   genderPreference?: string;
   minSeats?: number;
+  userGender?: string;
 }
 
 export async function fetchRides(filters?: RideFilters): Promise<Ride[]> {
@@ -96,7 +97,10 @@ export async function joinRide(rideId: string, userId: string): Promise<Ride> {
     credentials: "include",
   });
   if (!res.ok) {
-    const err: any = new Error(`Failed to join ride: ${res.status}`);
+    // Try to parse backend error message to show helpful feedback (e.g. gender mismatch)
+    const body = await res.json().catch(() => ({}));
+    const msg = body?.message || `Failed to join ride: ${res.status}`;
+    const err: any = new Error(msg);
     err.status = res.status;
     throw err;
   }
@@ -119,14 +123,16 @@ export async function leaveRide(rideId: string, userId: string): Promise<Ride> {
   return res.json();
 }
 
-export async function deleteRide(rideId: string): Promise<void> {
-  const url = `${API_BASE}/api/rides/${rideId}`;
+export async function deleteRide(rideId: string, userId?: string): Promise<void> {
+  const url = `${API_BASE}/api/rides/${rideId}${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`;
   const res = await fetch(url, {
     method: "DELETE",
     credentials: "include",
   });
   if (!res.ok) {
-    const err: any = new Error(`Failed to delete ride: ${res.status}`);
+    const body = await res.json().catch(() => ({}));
+    const msg = body?.message || `Failed to delete ride: ${res.status}`;
+    const err: any = new Error(msg);
     err.status = res.status;
     throw err;
   }

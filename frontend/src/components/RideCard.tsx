@@ -10,6 +10,7 @@ interface RideCardProps {
   currentUserId: string;
   onJoinRide: (rideId: string) => void;
   onLeaveRide: (rideId: string) => void;
+  onDeleteRide?: (rideId: string) => void;
   onRemoveParticipant?: (rideId: string, participantId: string) => void;
 }
 
@@ -18,11 +19,12 @@ export const RideCard = ({
   currentUserId,
   onJoinRide,
   onLeaveRide,
+  onDeleteRide,
   onRemoveParticipant,
 }: RideCardProps) => {
   const isDriver = ride.driverId === currentUserId;
-  const isParticipant = ride.participants.includes(currentUserId);
-  const isFull = ride.availableSeats === 0;
+  const isParticipant = Array.isArray(ride.participants) ? ride.participants.includes(currentUserId) : false;
+  const isFull = (ride.availableSeats ?? 0) === 0;
 
   const getGenderBadgeColor = (gender: string) => {
     switch (gender) {
@@ -118,7 +120,10 @@ export const RideCard = ({
                     fullName: p.fullName,
                     whatsappNumber: p.whatsappNumber,
                   }))
-                : ride.participants.map((id) => ({ _id: id, fullName: `Participant ${id.slice(-4)}`, whatsappNumber: "" }))
+                : (Array.isArray(ride.participants) ? ride.participants : []).map((id) => {
+                    const sid = String(id || "");
+                    return { _id: sid, fullName: `Participant ${sid.slice(-4)}`, whatsappNumber: "" };
+                  })
               ).map((p) => (
                 <div key={p._id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div className="flex items-center gap-3">
@@ -164,7 +169,24 @@ export const RideCard = ({
         )}
 
         <div className="flex gap-2">
-          {!isDriver && (
+          {isDriver ? (
+            <>
+              <Button
+                variant="destructive"
+                className="flex-1 shadow-sm hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  if (typeof onDeleteRide === "function") {
+                    // confirm before deleting
+                    if (window.confirm("Are you sure you want to cancel this ride? This cannot be undone.")) {
+                      onDeleteRide(ride._id);
+                    }
+                  }
+                }}
+              >
+                Cancel Ride
+              </Button>
+            </>
+          ) : (
             <>
               {isParticipant ? (
                 <Button

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Clock, ChevronUp, ChevronDown } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,8 @@ interface TimePickerProps {
   onChange: (time: string) => void;
   placeholder?: string;
   className?: string;
+  // if true, disable times before current time (useful when selected date is today)
+  disablePast?: boolean;
 }
 
 export const TimePicker: React.FC<TimePickerProps> = ({
@@ -15,6 +17,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   onChange,
   placeholder = "Select time",
   className,
+  disablePast = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,6 +64,24 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   const hours = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
   const minutes = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
+  const now = new Date();
+
+  const isHourDisabled = (hourStr: string) => {
+    if (!disablePast) return false;
+    const h = parseInt(hourStr, 10);
+    return h < now.getHours();
+  };
+
+  const isMinuteDisabled = (hourStr: string, minuteStr: string) => {
+    if (!disablePast) return false;
+    const h = parseInt(hourStr, 10);
+    const m = parseInt(minuteStr, 10);
+    if (h < now.getHours()) return true;
+    if (h > now.getHours()) return false;
+    // hour equals current hour
+    return m < now.getMinutes();
+  };
+
   const scrollToSelected = (containerId: string, selectedValue: string) => {
     const container = document.getElementById(containerId);
     if (container && selectedValue) {
@@ -103,24 +124,29 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                   className="h-32 overflow-y-auto scrollbar-hide"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
-                  {hours.map((hour) => (
-                    <Button
-                      key={hour}
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      data-value={hour}
-                      className={cn(
-                        "w-12 h-8 text-sm",
-                        selectedHour === hour
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent"
-                      )}
-                      onClick={() => handleHourChange(hour)}
-                    >
-                      {parseInt(hour) === 0 ? '12' : parseInt(hour) > 12 ? (parseInt(hour) - 12).toString() : hour}
-                    </Button>
-                  ))}
+                  {hours.map((hour) => {
+                    const disabled = isHourDisabled(hour);
+                    return (
+                      <Button
+                        key={hour}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-value={hour}
+                        className={cn(
+                          "w-12 h-8 text-sm",
+                          disabled && "opacity-50 cursor-not-allowed",
+                          selectedHour === hour
+                            ? "bg-primary text-primary-foreground"
+                            : !disabled && "hover:bg-accent"
+                        )}
+                        onClick={() => !disabled && handleHourChange(hour)}
+                        disabled={disabled}
+                      >
+                        {parseInt(hour) === 0 ? '12' : parseInt(hour) > 12 ? (parseInt(hour) - 12).toString() : hour}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -136,24 +162,29 @@ export const TimePicker: React.FC<TimePickerProps> = ({
                   className="h-32 overflow-y-auto scrollbar-hide"
                   style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                 >
-                  {minutes.map((minute) => (
-                    <Button
-                      key={minute}
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      data-value={minute}
-                      className={cn(
-                        "w-12 h-8 text-sm",
-                        selectedMinute === minute
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-accent"
-                      )}
-                      onClick={() => handleMinuteChange(minute)}
-                    >
-                      {minute}
-                    </Button>
-                  ))}
+                  {minutes.map((minute) => {
+                    const disabled = isMinuteDisabled(selectedHour || '00', minute);
+                    return (
+                      <Button
+                        key={minute}
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-value={minute}
+                        className={cn(
+                          "w-12 h-8 text-sm",
+                          disabled && "opacity-50 cursor-not-allowed",
+                          selectedMinute === minute
+                            ? "bg-primary text-primary-foreground"
+                            : !disabled && "hover:bg-accent"
+                        )}
+                        onClick={() => !disabled && handleMinuteChange(minute)}
+                        disabled={disabled}
+                      >
+                        {minute}
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
