@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
 
 const PostAuth = () => {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ const PostAuth = () => {
     if (!isSignedIn) return;
     const email = user?.primaryEmailAddress?.emailAddress;
     if (!email) {
-      navigate("/user-details", { replace: true });
+      // email not loaded yet from Clerk - wait for user object to populate
       return;
     }
     const check = async () => {

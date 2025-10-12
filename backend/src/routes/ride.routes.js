@@ -6,6 +6,7 @@ import {
   joinRide,
   leaveRide,
   deleteRide,
+  getRideSuggestions,
 } from "../controllers/ride.controller.js";
 
 const router = express.Router();
@@ -13,6 +14,11 @@ const router = express.Router();
 router.route("/")
   .get(getRides)
   .post(createRide);
+
+// parameterized routes will be defined after the specific routes
+
+// Place specific routes before parameterized routes to avoid route collisions
+router.route("/suggestions").get(getRideSuggestions);
 
 router.route("/:id")
   .get(getRideById)

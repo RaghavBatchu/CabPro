@@ -61,6 +61,28 @@ export async function fetchRides(filters?: RideFilters): Promise<Ride[]> {
   return res.json();
 }
 
+export async function fetchRideSuggestions(filters: RideFilters & { windowMinutes?: number }): Promise<Ride[]> {
+  if (!filters.date || !filters.time) {
+    throw new Error('date and time are required for suggestions');
+  }
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) params.append(k, String(v));
+  });
+  if (filters.windowMinutes !== undefined) params.append('windowMinutes', String(filters.windowMinutes));
+  const urlObj = new URL('/api/rides/suggestions', API_BASE);
+  urlObj.search = params.toString();
+  const url = urlObj.toString();
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const msg = body?.message || `Failed to fetch suggestions: ${res.status}`;
+    console.error('fetchRideSuggestions failed', { url, status: res.status, body });
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export async function createRide(payload: CreateRidePayload): Promise<Ride> {
   const url = `${API_BASE}/api/rides`;
   const res = await fetch(url, {
