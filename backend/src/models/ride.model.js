@@ -34,6 +34,18 @@ const rideSchema = new mongoose.Schema(
       type: String, // e.g. "09:30"
       required: [true, "Time is required"],
     },
+    // numeric minutes since midnight to make time-range queries easier
+    timeMinutes: {
+      type: Number,
+      required: false,
+      index: true,
+    },
+    // AM or PM label to help display and small filters
+    timePeriod: {
+      type: String,
+      enum: ["AM", "PM"],
+      required: false,
+    },
     genderPreference: {
       type: String,
       enum: ["All", "Male", "Female"],

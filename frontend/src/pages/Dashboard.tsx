@@ -13,7 +13,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
-import { fetchRides, joinRide, leaveRide, Ride, RideFilters } from "@/services/rideApi";
+import { fetchRides, joinRide, leaveRide, Ride, RideFilters, fetchRideSuggestions } from "@/services/rideApi";
 import { deleteRide as apiDeleteRide } from "@/services/rideApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
@@ -30,9 +30,14 @@ const Dashboard = () => {
   const [timeFilter, setTimeFilter] = useState<string>("");
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
+  const [suggestions, setSuggestions] = useState<Ride[]>([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionWindow, setSuggestionWindow] = useState<string | null>(null);
+  const [originOptions, setOriginOptions] = useState<string[]>([]);
+  const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
 
-  const origins = Array.from(new Set(rides.map((r) => r.origin)));
-  const destinations = Array.from(new Set(rides.map((r) => r.destination)));
+  const origins = originOptions.length > 0 ? originOptions : Array.from(new Set(rides.map((r) => r.origin)));
+  const destinations = destinationOptions.length > 0 ? destinationOptions : Array.from(new Set(rides.map((r) => r.destination)));
 
   const todayYmd = (() => {
     const d = new Date();
@@ -77,8 +82,13 @@ const Dashboard = () => {
           filters.userGender = effectiveUserData.gender;
         }
 
-        const ridesData = await fetchRides(filters);
-        setRides(ridesData);
+    const ridesData = await fetchRides(filters);
+    setRides(ridesData);
+    setSuggestions([]);
+    const newOrigins = Array.from(new Set(ridesData.map((r:any) => r.origin))).filter(Boolean);
+    const newDestinations = Array.from(new Set(ridesData.map((r:any) => r.destination))).filter(Boolean);
+    if (newOrigins.length > 0) setOriginOptions(newOrigins);
+    if (newDestinations.length > 0) setDestinationOptions(newDestinations);
       } catch (error) {
         console.error("Failed to load data:", error);
         toast.error("Failed to load rides");
@@ -96,6 +106,39 @@ const Dashboard = () => {
 
     return () => clearInterval(interval);
   }, [user, userData, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
+
+  // When there are no rides and user provided date+time filters, request suggestions
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (loading) return;
+      if (rides.length > 0) return;
+      if (!dateFilter || !timeFilter) return;
+      try {
+        setSuggestionLoading(true);
+        setSuggestions([]);
+        // compute window for UI
+        const [h, m] = timeFilter.split(':').map(n => parseInt(n, 10));
+        const reqMinutes = (h || 0) * 60 + (isNaN(m) ? 0 : m);
+        const startMin = reqMinutes - 30;
+        const endMin = reqMinutes + 30;
+        const fmt = (minutes: number) => {
+          const mm = ((minutes % 60) + 60) % 60;
+          const hh = Math.floor(((minutes - mm) / 60 + 24) % 24);
+          const period = hh >= 12 ? 'PM' : 'AM';
+          const displayHour = hh % 12 === 0 ? 12 : hh % 12;
+          return `${displayHour}:${mm.toString().padStart(2, '0')} ${period}`;
+        };
+        setSuggestionWindow(`${fmt(startMin)} - ${fmt(endMin)}`);
+        const s = await fetchRideSuggestions({ origin: originFilter !== 'all' ? originFilter : undefined, destination: destinationFilter !== 'all' ? destinationFilter : undefined, date: dateFilter, time: timeFilter, windowMinutes: 30 });
+        setSuggestions(s);
+      } catch (err) {
+        console.error('Failed to fetch suggestions:', err);
+      } finally {
+        setSuggestionLoading(false);
+      }
+    };
+    fetchSuggestions();
+  }, [loading, rides, dateFilter, timeFilter, originFilter, destinationFilter]);
 
   const filteredRides = rides;
 
@@ -339,9 +382,36 @@ const Dashboard = () => {
           ))
         ) : (
           <div className="col-span-full text-center py-12">
-            <p className="text-lg text-muted-foreground mb-4">
-              No rides match your filters
-            </p>
+            <p className="text-lg text-muted-foreground mb-4">No rides match your filters</p>
+            {dateFilter && timeFilter ? (
+              <div className="mb-6">
+                <h3 className="text-md font-semibold mb-3">Suggested close matches (±30 minutes)</h3>
+                {suggestionLoading ? (
+                  <p className="text-sm text-muted-foreground">Searching for nearby times... {suggestionWindow ? `Showing rides between ${suggestionWindow}` : ''}</p>
+                ) : (
+                  <>
+                    {suggestionWindow && <p className="text-sm text-muted-foreground mb-2">Showing rides between {suggestionWindow}</p>}
+                    {suggestions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No nearby times found.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                        {suggestions.map(s => (
+                          <RideCard
+                            key={s._id}
+                            ride={s}
+                            currentUserId={userData?._id || ""}
+                            onJoinRide={handleJoinRide}
+                            onLeaveRide={handleLeaveRide}
+                            onRemoveParticipant={handleRemoveParticipant}
+                            onDeleteRide={handleDeleteRide}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : null}
             <Button 
               onClick={() => setShowCreateModal(true)}
               className="btn-primary"

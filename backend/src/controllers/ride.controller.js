@@ -123,6 +123,80 @@ export const getRides = async (req, res) => {
   }
 };
 
+// @desc    Suggest nearby rides within a time window
+// @route   GET /api/rides/suggestions
+export const getRideSuggestions = async (req, res) => {
+  try {
+    const { origin, destination, date, time, windowMinutes = 30 } = req.query;
+
+    if (!date || !time) {
+      return res.status(400).json({ message: "date and time are required for suggestions" });
+    }
+
+    // Build base filter: match origin/destination if provided
+    const filter = {};
+    if (origin && origin !== 'All') filter.origin = origin;
+    if (destination && destination !== 'All') filter.destination = destination;
+
+    // Only consider rides on the requested date
+    // Parse date as YYYY-MM-DD into a local Date to avoid timezone/UTC shifting
+    let requestedDate;
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const [yy, mm, dd] = date.split('-').map(n => parseInt(n, 10));
+      requestedDate = new Date(yy, mm - 1, dd);
+    } else {
+      requestedDate = new Date(date);
+    }
+    const startOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate());
+    const endOfDay = new Date(requestedDate.getFullYear(), requestedDate.getMonth(), requestedDate.getDate() + 1);
+    filter.date = { $gte: startOfDay, $lt: endOfDay };
+
+    const rides = await Ride.find(filter).sort({ date: 1, time: 1 });
+
+    // parse requested time
+    const [rh, rm] = String(time).split(':').map(n => parseInt(n, 10));
+    if (isNaN(rh)) return res.status(400).json({ message: 'Invalid time' });
+    const requestedMinutes = (rh * 60) + (isNaN(rm) ? 0 : rm);
+    const win = Number(windowMinutes) || 30;
+
+    // find rides with time within +/- window
+    const candidates = rides.filter(r => {
+      try {
+        let rideMinutes = null;
+        if (typeof r.timeMinutes === 'number') {
+          rideMinutes = r.timeMinutes;
+        } else if (r.time) {
+          const [h, m] = String(r.time).split(':').map(n => parseInt(n, 10));
+          if (!isNaN(h)) rideMinutes = (h * 60) + (isNaN(m) ? 0 : m);
+        }
+        if (rideMinutes === null) return false;
+        const diff = Math.abs(rideMinutes - requestedMinutes);
+        return diff <= win;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    // Enrich candidate rides with participant info similar to getRides
+    const allParticipantIds = [...new Set(candidates.flatMap(ride => ride.participants || []))];
+    const allParticipants = allParticipantIds.length > 0 ? await User.find({ _id: { $in: allParticipantIds } }).select("fullName whatsappNumber gender") : [];
+    const participantMap = new Map();
+    allParticipants.forEach(p => participantMap.set(p._id.toString(), p));
+
+    const enriched = candidates.map(ride => {
+      const participants = ride.participants || [];
+      const participantsInfo = participants.map(id => participantMap.get(id.toString())).filter(Boolean);
+      const rideObj = ride.toObject();
+      return { ...rideObj, participantsInfo };
+    });
+
+    res.status(200).json(enriched);
+  } catch (error) {
+    console.error('getRideSuggestions error:', error);
+    res.status(500).json({ message: 'Failed to fetch suggestions', error: error.message });
+  }
+};
+
 // @desc    Create a new ride
 // @route   POST /api/rides
 export const createRide = async (req, res) => {
@@ -151,6 +225,21 @@ export const createRide = async (req, res) => {
       destination,
       date,
       time,
+      // compute minutes since midnight and AM/PM
+      timeMinutes: (() => {
+        try {
+          const parts = String(time).split(':').map(n => parseInt(n, 10));
+          if (parts.length >= 1 && !isNaN(parts[0])) return (parts[0] * 60) + (isNaN(parts[1]) ? 0 : parts[1]);
+        } catch (e) {}
+        return undefined;
+      })(),
+      timePeriod: (() => {
+        try {
+          const hour = parseInt(String(time).split(':')[0], 10);
+          if (!isNaN(hour)) return hour >= 12 ? 'PM' : 'AM';
+        } catch (e) {}
+        return undefined;
+      })(),
       genderPreference: genderPreference || "All",
       totalSeats,
       availableSeats: totalSeats,
