@@ -14,6 +14,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
 import { fetchRides, joinRide, leaveRide, Ride, RideFilters } from "@/services/rideApi";
+import { deleteRide as apiDeleteRide } from "@/services/rideApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
 
@@ -33,16 +34,30 @@ const Dashboard = () => {
   const origins = Array.from(new Set(rides.map((r) => r.origin)));
   const destinations = Array.from(new Set(rides.map((r) => r.destination)));
 
+  const todayYmd = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
   // Load user data and rides
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
-        
-        // Load user data
-        if (user?.primaryEmailAddress?.emailAddress) {
-          const userInfo = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
-          setUserData(userInfo);
+        // Load user data once (don't refetch on every effect run)
+        // Use the fetched user info locally so we can immediately pass userGender to the rides fetch
+        let effectiveUserData = userData;
+        if (user?.primaryEmailAddress?.emailAddress && !effectiveUserData) {
+          try {
+            const userInfo = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+            setUserData(userInfo);
+            effectiveUserData = userInfo;
+          } catch (err) {
+            console.error('Failed to load user data:', err);
+          }
         }
 
         // Load rides with current filters
@@ -51,8 +66,16 @@ const Dashboard = () => {
         if (destinationFilter !== "all") filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
-        if (genderFilter !== "all") filters.genderPreference = genderFilter;
+        // Normalize gender filter: map UI value "Any" to backend "All"
+        if (genderFilter !== "all") {
+          const normalizedGender = genderFilter === "Any" ? "All" : genderFilter;
+          filters.genderPreference = normalizedGender;
+        }
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+        // Ensure we include the current user's gender so backend can filter rides
+        if (effectiveUserData?.gender) {
+          filters.userGender = effectiveUserData.gender;
+        }
 
         const ridesData = await fetchRides(filters);
         setRides(ridesData);
@@ -65,7 +88,7 @@ const Dashboard = () => {
     };
 
     loadData();
-  }, [user, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
+  }, [user, userData, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
 
   const filteredRides = rides;
 
@@ -112,17 +135,51 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteRide = async (rideId: string) => {
+    if (!userData) {
+      toast.error("User data not available");
+      return;
+    }
+
+    try {
+      await apiDeleteRide(rideId, userData._id);
+      setRides(prev => prev.filter(r => r._id !== rideId));
+      toast.success("Ride cancelled successfully");
+    } catch (error: any) {
+      console.error("Failed to delete ride:", error);
+      toast.error(error.message || "Failed to cancel ride");
+    }
+  };
+
   const handleRideCreated = () => {
     // Reload rides after creating a new one
     const loadRides = async () => {
       try {
+        // If userData is not loaded yet (rare), fetch it so we can pass gender to the backend
+        let effectiveUserData = userData;
+        if (!effectiveUserData && user?.primaryEmailAddress?.emailAddress) {
+          try {
+            const ud = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+            setUserData(ud);
+            effectiveUserData = ud;
+          } catch (err) {
+            console.error('Failed to fetch user data during reload:', err);
+          }
+        }
+
         const filters: RideFilters = {};
         if (originFilter !== "all") filters.origin = originFilter;
         if (destinationFilter !== "all") filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
-        if (genderFilter !== "all") filters.genderPreference = genderFilter;
+        if (genderFilter !== "all") {
+          const normalizedGender = genderFilter === "Any" ? "All" : genderFilter;
+          filters.genderPreference = normalizedGender;
+        }
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+        if (effectiveUserData?.gender) {
+          filters.userGender = effectiveUserData.gender;
+        }
 
         const ridesData = await fetchRides(filters);
         setRides(ridesData);
@@ -215,6 +272,7 @@ const Dashboard = () => {
               value={timeFilter}
               onChange={setTimeFilter}
               placeholder="Select time"
+              disablePast={dateFilter === todayYmd}
             />
           </div>
 
@@ -262,14 +320,15 @@ const Dashboard = () => {
           </div>
         ) : filteredRides.length > 0 ? (
           filteredRides.map((ride) => (
-            <RideCard
-              key={ride._id}
-              ride={ride}
-              currentUserId={userData?._id}
-              onJoinRide={handleJoinRide}
-              onLeaveRide={handleLeaveRide}
-              onRemoveParticipant={handleRemoveParticipant}
-            />
+              <RideCard
+                key={ride._id}
+                ride={ride}
+                currentUserId={userData?._id || ""}
+                onJoinRide={handleJoinRide}
+                onLeaveRide={handleLeaveRide}
+                onRemoveParticipant={handleRemoveParticipant}
+                onDeleteRide={handleDeleteRide}
+              />
           ))
         ) : (
           <div className="col-span-full text-center py-12">

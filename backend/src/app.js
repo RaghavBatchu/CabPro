@@ -3,6 +3,7 @@ import cors from "cors";
 import userRouter from "./routes/user.routes.js";
 import reviewRouter from "./routes/review.routes.js";
 import rideRouter from "./routes/ride.routes.js";
+import historyRouter from "./routes/history.routes.js";
 import connectDB from "../Database/mongodb.js";
 
 const app = express();
@@ -28,6 +29,7 @@ app.get("/health", (_req, res) => {
 app.use("/api/users", userRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/rides", rideRouter);
+app.use("/api/history", historyRouter);
 
 // Initialize DB connection on import
 connectDB();

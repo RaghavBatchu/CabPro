@@ -1,4 +1,4 @@
-import { Phone, Users, Clock, MapPin, User } from "lucide-react";
+import { Phone, Users, Clock, MapPin, User, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ interface RideCardProps {
   currentUserId: string;
   onJoinRide: (rideId: string) => void;
   onLeaveRide: (rideId: string) => void;
+  onDeleteRide?: (rideId: string) => void;
   onRemoveParticipant?: (rideId: string, participantId: string) => void;
 }
 
@@ -18,11 +19,12 @@ export const RideCard = ({
   currentUserId,
   onJoinRide,
   onLeaveRide,
+  onDeleteRide,
   onRemoveParticipant,
 }: RideCardProps) => {
   const isDriver = ride.driverId === currentUserId;
-  const isParticipant = ride.participants.includes(currentUserId);
-  const isFull = ride.availableSeats === 0;
+  const isParticipant = Array.isArray(ride.participants) ? ride.participants.includes(currentUserId) : false;
+  const isFull = (ride.availableSeats ?? 0) === 0;
 
   const getGenderBadgeColor = (gender: string) => {
     switch (gender) {
@@ -36,7 +38,7 @@ export const RideCard = ({
   };
 
   return (
-    <Card className="ride-card hover:bg-[hsl(var(--ride-card-hover))]">
+    <Card className="ride-card hover:bg-[hsl(var(--ride-card-hover))] transition-all duration-300">
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -89,38 +91,77 @@ export const RideCard = ({
         </div>
 
         {(isParticipant || isDriver) && (
-          <div className="flex items-center gap-2 rounded-lg bg-accent p-3">
-            <Phone className="h-4 w-4 text-accent-foreground" />
-            <span className="text-sm font-medium text-accent-foreground">
-              {ride.driverPhone}
-            </span>
+          <div className="flex items-center gap-3 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 p-4 shadow-md">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Phone className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-white/80 font-medium">Ride Leader Contact</p>
+              <a href={`tel:${ride.driverPhone}`} className="text-base font-bold text-white hover:underline">
+                {ride.driverPhone}
+              </a>
+            </div>
           </div>
         )}
 
-        {isDriver && ride.participants.length > 0 && (
+        {(isDriver || isParticipant) && ride.participants.length > 0 && (
           <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-sm font-medium text-card-foreground">Participants:</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <p className="text-sm font-medium text-card-foreground">Participants:</p>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {ride.participants.length}
+              </Badge>
+            </div>
             <div className="space-y-2">
-              {ride.participants.map((participantId) => (
-                <div
-                  key={participantId}
-                  className="flex items-center justify-between rounded-lg bg-muted p-2"
-                >
-                  <div className="flex items-center gap-2">
+              {(ride.participantsInfo && ride.participantsInfo.length
+                ? ride.participantsInfo.map((p) => ({
+                    _id: p._id,
+                    fullName: p.fullName,
+                    whatsappNumber: p.whatsappNumber,
+                  }))
+                : (Array.isArray(ride.participants) ? ride.participants : []).map((id) => {
+                    const sid = String(id || "");
+                    return { _id: sid, fullName: `Participant ${sid.slice(-4)}`, whatsappNumber: "" };
+                  })
+              ).map((p) => (
+                <div key={p._id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div className="flex items-center gap-3">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-card-foreground">
-                      Participant {participantId.slice(-4)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm text-card-foreground font-medium">{p.fullName}</span>
+                      {p.whatsappNumber && (
+                        <span className="text-xs text-muted-foreground">{p.whatsappNumber}</span>
+                      )}
+                    </div>
                   </div>
-                  {onRemoveParticipant && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => onRemoveParticipant(ride._id, participantId)}
-                    >
-                      Remove
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {p.whatsappNumber && (
+                      <a
+                        href={`https://wa.me/${p.whatsappNumber}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <Button 
+                          size="sm" 
+                          className="flex items-center gap-1 bg-[#25D366] hover:bg-[#20BA5A] text-white border-0 shadow-sm hover:shadow-md transition-all duration-200"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          WhatsApp
+                        </Button>
+                      </a>
+                    )}
+                    {isDriver && onRemoveParticipant && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => onRemoveParticipant(ride._id, p._id)}
+                        className="shadow-sm hover:shadow-md transition-all duration-200"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -128,19 +169,36 @@ export const RideCard = ({
         )}
 
         <div className="flex gap-2">
-          {!isDriver && (
+          {isDriver ? (
+            <>
+              <Button
+                variant="destructive"
+                className="flex-1 shadow-sm hover:shadow-md transition-all duration-200"
+                onClick={() => {
+                  if (typeof onDeleteRide === "function") {
+                    // confirm before deleting
+                    if (window.confirm("Are you sure you want to cancel this ride? This cannot be undone.")) {
+                      onDeleteRide(ride._id);
+                    }
+                  }
+                }}
+              >
+                Cancel Ride
+              </Button>
+            </>
+          ) : (
             <>
               {isParticipant ? (
                 <Button
                   variant="outline"
-                  className="flex-1 hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))]"
+                  className="flex-1 hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))] transition-all duration-200"
                   onClick={() => onLeaveRide(ride._id)}
                 >
                   Leave Ride
                 </Button>
               ) : (
                 <Button
-                  className="btn-primary flex-1"
+                  className="btn-primary flex-1 transition-all duration-200"
                   disabled={isFull}
                   onClick={() => onJoinRide(ride._id)}
                 >
