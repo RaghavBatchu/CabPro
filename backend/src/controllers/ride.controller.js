@@ -85,10 +85,38 @@ export const getRides = async (req, res) => {
       return { ...rideObj, participantsInfo };
     });
 
+    // Remove rides that are in the past when no specific date filter is provided
+    let finalRides = enrichedRides;
+    if (!date) {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      finalRides = enrichedRides.filter(r => {
+        try {
+          const rideDate = new Date(r.date);
+          const rideDay = new Date(rideDate.getFullYear(), rideDate.getMonth(), rideDate.getDate());
+          // If ride date is before today -> exclude
+          if (rideDay < startOfToday) return false;
+          // If ride is today, compare time (if present)
+          if (rideDay.getTime() === startOfToday.getTime() && r.time) {
+            const [rh, rm] = String(r.time).split(':').map(n => parseInt(n, 10));
+            if (!isNaN(rh)) {
+              const nowH = now.getHours();
+              const nowM = now.getMinutes();
+              if (rh < nowH) return false;
+              if (rh === nowH && !isNaN(rm) && rm < nowM) return false;
+            }
+          }
+          return true;
+        } catch (e) {
+          return true;
+        }
+      });
+    }
+
     const endTime = Date.now();
-    console.log(`getRides took ${endTime - startTime}ms for ${enrichedRides.length} rides`);
-    
-    res.status(200).json(enrichedRides);
+    console.log(`getRides took ${endTime - startTime}ms for ${finalRides.length} rides`);
+
+    res.status(200).json(finalRides);
   } catch (error) {
     console.error("getRides error:", error);
     res.status(500).json({ message: "Failed to fetch rides", error: error.message });

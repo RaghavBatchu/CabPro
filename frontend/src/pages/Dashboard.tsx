@@ -88,6 +88,13 @@ const Dashboard = () => {
     };
 
     loadData();
+
+    // Refresh rides every 60 seconds so past rides are removed dynamically
+    const interval = setInterval(() => {
+      loadData();
+    }, 60 * 1000);
+
+    return () => clearInterval(interval);
   }, [user, userData, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
 
   const filteredRides = rides;
