@@ -11,10 +11,10 @@ export const Navigation = () => {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-black/10 bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]">
-      <div className="mx-auto max-w-6xl px-4">
+    <nav className="sticky top-0 z-50 border-b border-black/10 bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))] w-full">
+      <div className="mx-auto max-w-full px-8">
         <div className="flex h-14 items-center justify-between">
-          <NavLink to="/" className="flex items-center gap-2 hover:opacity-90">
+          <NavLink to="/" className="flex items-center gap-2 hover:opacity-90 ml-2 sm:ml-4">
             <Car className="h-6 w-6 text-[hsl(var(--primary))]" />
             <span className="text-xl font-bold">CabPro</span>
           </NavLink>
