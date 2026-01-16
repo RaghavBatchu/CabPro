@@ -23,8 +23,23 @@ export const RideCard = ({
   onRemoveParticipant,
 }: RideCardProps) => {
   const isDriver = ride.driverId === currentUserId;
-  const isParticipant = Array.isArray(ride.participants) ? ride.participants.includes(currentUserId) : false;
+  const isParticipant = Array.isArray(ride.participants)
+    ? ride.participants.includes(currentUserId)
+    : false;
   const isFull = (ride.availableSeats ?? 0) === 0;
+
+  const getWhatsAppLink = (number: string) => {
+    const cleaned = number.replace(/\D/g, "");
+    const phone = `91${cleaned}`; // India-only project
+
+    const isDesktop =
+      typeof navigator !== "undefined" &&
+      !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    return isDesktop
+      ? `https://web.whatsapp.com/send?phone=${phone}`
+      : `https://wa.me/${phone}`;
+  };
 
   const getGenderBadgeColor = (gender: string) => {
     switch (gender) {
@@ -61,7 +76,9 @@ export const RideCard = ({
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
-                <span>{ride.time} • {new Date(ride.date).toLocaleDateString()}</span>
+                <span>
+                  {ride.time} • {new Date(ride.date).toLocaleDateString()}
+                </span>
               </div>
             </div>
           </div>
@@ -86,7 +103,8 @@ export const RideCard = ({
         <div className="flex items-center gap-2 text-sm">
           <Users className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">
-            {ride.totalSeats - ride.availableSeats}/{ride.totalSeats} seats filled
+            {ride.totalSeats - ride.availableSeats}/{ride.totalSeats} seats
+            filled
           </span>
         </div>
 
@@ -96,8 +114,13 @@ export const RideCard = ({
               <Phone className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-xs text-white/80 font-medium">Ride Leader Contact</p>
-              <a href={`tel:${ride.driverPhone}`} className="text-base font-bold text-white hover:underline">
+              <p className="text-xs text-white/80 font-medium">
+                Ride Leader Contact
+              </p>
+              <a
+                href={`tel:${ride.driverPhone}`}
+                className="text-base font-bold text-white hover:underline"
+              >
                 {ride.driverPhone}
               </a>
             </div>
@@ -108,7 +131,9 @@ export const RideCard = ({
           <div className="space-y-2 border-t border-border pt-4">
             <div className="flex items-center gap-2 mb-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <p className="text-sm font-medium text-card-foreground">Participants:</p>
+              <p className="text-sm font-medium text-card-foreground">
+                Participants:
+              </p>
               <Badge variant="secondary" className="ml-auto text-xs">
                 {ride.participants.length}
               </Badge>
@@ -120,30 +145,44 @@ export const RideCard = ({
                     fullName: p.fullName,
                     whatsappNumber: p.whatsappNumber,
                   }))
-                : (Array.isArray(ride.participants) ? ride.participants : []).map((id) => {
+                : (Array.isArray(ride.participants)
+                    ? ride.participants
+                    : []
+                  ).map((id) => {
                     const sid = String(id || "");
-                    return { _id: sid, fullName: `Participant ${sid.slice(-4)}`, whatsappNumber: "" };
+                    return {
+                      _id: sid,
+                      fullName: `Participant ${sid.slice(-4)}`,
+                      whatsappNumber: "",
+                    };
                   })
               ).map((p) => (
-                <div key={p._id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div
+                  key={p._id}
+                  className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                >
                   <div className="flex items-center gap-3">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <div className="flex flex-col">
-                      <span className="text-sm text-card-foreground font-medium">{p.fullName}</span>
+                      <span className="text-sm text-card-foreground font-medium">
+                        {p.fullName}
+                      </span>
                       {p.whatsappNumber && (
-                        <span className="text-xs text-muted-foreground">{p.whatsappNumber}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {p.whatsappNumber}
+                        </span>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {p.whatsappNumber && (
                       <a
-                        href={`https://wa.me/${p.whatsappNumber}`}
+                        href={getWhatsAppLink(p.whatsappNumber)}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           className="flex items-center gap-1 bg-[#25D366] hover:bg-[#20BA5A] text-white border-0 shadow-sm hover:shadow-md transition-all duration-200"
                         >
                           <MessageCircle className="h-4 w-4" />
@@ -177,7 +216,11 @@ export const RideCard = ({
                 onClick={() => {
                   if (typeof onDeleteRide === "function") {
                     // confirm before deleting
-                    if (window.confirm("Are you sure you want to cancel this ride? This cannot be undone.")) {
+                    if (
+                      window.confirm(
+                        "Are you sure you want to cancel this ride? This cannot be undone."
+                      )
+                    ) {
                       onDeleteRide(ride._id);
                     }
                   }
