@@ -5,16 +5,20 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, MapPin, User, Trash2, Car, Users, RefreshCw, UserCheck } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Trash2, Car, Users, RefreshCw, UserCheck, CheckCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
-import { fetchRideHistory, deleteHistoryEntry, categorizeRides, isRideDatePassed, backfillHistory, HistoryEntry } from "@/services/historyApi";
+import { fetchRideHistory, deleteHistoryEntry, categorizeRides, isRideDatePassed, backfillHistory, HistoryEntry, markRideCompleted, reportRideIssue } from "@/services/historyApi";
 import { fetchUserByEmail } from "@/services/userApi";
+import { reportIssue } from "@/services/reviewApi";
+import ReportIssueModal from "@/components/ReportIssueModal";
 
 const RideHistory = () => {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("current");
   const [userData, setUserData] = useState<any>(null);
+  const [reportingIssueId, setReportingIssueId] = useState<string | null>(null);
+  const [reportingRideInfo, setReportingRideInfo] = useState<any>(null);
 
   // Load user data to get the correct user ID
   useEffect(() => {
@@ -55,6 +59,47 @@ const RideHistory = () => {
     },
   });
 
+  // Mark ride as completed mutation
+  const completeMutation = useMutation({
+    mutationFn: markRideCompleted,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rideHistory"] });
+      toast.success("Ride marked as completed safely");
+    },
+    onError: (error: any) => {
+      toast.error("Failed to mark ride as completed");
+      console.error("Error:", error);
+    },
+  });
+
+  // Report issue mutation
+  const reportIssueMutation = useMutation({
+    mutationFn: async ({ historyId, issueDescription }: { historyId: string; issueDescription: string }) => {
+      // First, update the history entry with the issue
+      await reportRideIssue(historyId, issueDescription);
+      
+      // Then create a review entry as an issue report
+      const rideData = history?.find(h => h._id === historyId);
+      if (rideData && user) {
+        await reportIssue({
+          name: user.fullName || user.primaryEmailAddress?.emailAddress || "Unknown",
+          comment: issueDescription,
+          historyId,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rideHistory"] });
+      toast.success("Issue reported successfully");
+      setReportingIssueId(null);
+      setReportingRideInfo(null);
+    },
+    onError: (error: any) => {
+      toast.error("Failed to report issue");
+      console.error("Error:", error);
+    },
+  });
+
   // Backfill history mutation
   const backfillMutation = useMutation({
     mutationFn: () => backfillHistory(userData?._id || ""),
@@ -75,6 +120,19 @@ const RideHistory = () => {
     if (window.confirm("Are you sure you want to delete this history entry?")) {
       deleteMutation.mutate(historyId);
     }
+  };
+
+  const handleCompleted = (historyId: string) => {
+    completeMutation.mutate(historyId);
+  };
+
+  const handleReportIssue = (ride: HistoryEntry) => {
+    setReportingIssueId(ride._id);
+    setReportingRideInfo({
+      origin: ride.origin,
+      destination: ride.destination,
+      driverName: ride.driverName,
+    });
   };
 
   const handleBackfill = () => {
@@ -99,6 +157,18 @@ const RideHistory = () => {
     });
   };
 
+  const getCompletionStatusColor = (status: string) => {
+    if (status === "issue_reported") return "destructive";
+    if (status === "completed_safely") return "default";
+    return "secondary";
+  };
+
+  const getCompletionStatusText = (status: string) => {
+    if (status === "issue_reported") return "Issue Reported";
+    if (status === "completed_safely") return "Completed Safely";
+    return "Pending";
+  };
+
   const getStatusColor = (status: string, date: string) => {
     if (status === "cancelled") return "destructive";
     if (isRideDatePassed(date)) return "secondary";
@@ -111,73 +181,124 @@ const RideHistory = () => {
     return "Upcoming";
   };
 
-  const RideCard = ({ ride }: { ride: HistoryEntry }) => (
-    <Card className="mb-4">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              {ride.role === "driver" ? (
-                <Car className="h-4 w-4 text-blue-600" />
-              ) : (
-                <Users className="h-4 w-4 text-green-600" />
+  const RideCard = ({ ride }: { ride: HistoryEntry }) => {
+    const isPastRide = isRideDatePassed(ride.date) && ride.status !== "cancelled";
+    const isPending = ride.completionStatus === "pending" || !ride.completionStatus;
+    
+    return (
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                {ride.role === "driver" ? (
+                  <Car className="h-4 w-4 text-blue-600" />
+                ) : (
+                  <Users className="h-4 w-4 text-green-600" />
+                )}
+                <span className="text-sm font-medium capitalize">{ride.role}</span>
+              </div>
+              {isPastRide && (
+                <Badge variant={getCompletionStatusColor(ride.completionStatus)}>
+                  {getCompletionStatusText(ride.completionStatus)}
+                </Badge>
               )}
-              <span className="text-sm font-medium capitalize">{ride.role}</span>
+              {!isPastRide && (
+                <Badge variant={getStatusColor(ride.status, ride.date)}>
+                  {getStatusText(ride.status, ride.date)}
+                </Badge>
+              )}
             </div>
-            <Badge variant={getStatusColor(ride.status, ride.date)}>
-              {getStatusText(ride.status, ride.date)}
-            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(ride._id)}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(ride._id)}
-            className="text-red-500 hover:text-red-700 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-gray-500" />
-            <span className="text-sm">
-              <span className="font-medium">{ride.origin}</span> →{" "}
-              <span className="font-medium">{ride.destination}</span>
-            </span>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">
+                <span className="font-medium">{ride.origin}</span> →{" "}
+                <span className="font-medium">{ride.destination}</span>
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">{formatDate(ride.date)}</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">{formatTime(ride.time)}</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-500" />
+              <span className="text-sm">Ride Leader: {ride.driverName}</span>
+            </div>
+            
+            {ride.participantsInfo && ride.participantsInfo.length > 0 && (
+              <div className="flex items-start gap-2">
+                <UserCheck className="h-4 w-4 text-gray-500 mt-0.5" />
+                <div className="text-sm">
+                  <span className="text-gray-500">Participants: </span>
+                  <span className="font-medium">
+                    {ride.participantsInfo.map(p => p.fullName).join(", ")}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Action buttons for past rides */}
+            {isPastRide && isPending && (
+              <div className="flex gap-2 mt-4 pt-4 border-t">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleCompleted(ride._id)}
+                  disabled={completeMutation.isPending}
+                  className="flex-1 flex items-center gap-2"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  {completeMutation.isPending ? "Marking..." : "Completed Safely"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleReportIssue(ride)}
+                  disabled={reportIssueMutation.isPending}
+                  className="flex-1 flex items-center gap-2"
+                >
+                  <AlertCircle className="h-4 w-4" />
+                  Report Issue
+                </Button>
+              </div>
+            )}
+
+            {/* Show issue details if reported */}
+            {isPastRide && ride.completionStatus === "issue_reported" && ride.issueDescription && (
+              <div className="mt-4 pt-4 border-t bg-red-50 p-3 rounded">
+                <p className="text-sm font-medium text-red-900">Issue Reported:</p>
+                <p className="text-sm text-red-800 mt-1">{ride.issueDescription}</p>
+                {ride.issueReportedAt && (
+                  <p className="text-xs text-red-700 mt-2">
+                    Reported on {new Date(ride.issueReportedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-          
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
-            <span className="text-sm">{formatDate(ride.date)}</span>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm">{formatTime(ride.time)}</span>
-          </div>
-          
-           <div className="flex items-center gap-2">
-             <User className="h-4 w-4 text-gray-500" />
-             <span className="text-sm">Ride Leader: {ride.driverName}</span>
-           </div>
-           
-           {ride.participantsInfo && ride.participantsInfo.length > 0 && (
-             <div className="flex items-start gap-2">
-               <UserCheck className="h-4 w-4 text-gray-500 mt-0.5" />
-               <div className="text-sm">
-                 <span className="text-gray-500">Participants: </span>
-                 <span className="font-medium">
-                   {ride.participantsInfo.map(p => p.fullName).join(", ")}
-                 </span>
-               </div>
-             </div>
-           )}
-         </div>
-       </CardContent>
-     </Card>
-   );
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -210,7 +331,7 @@ const RideHistory = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Ride History</h1>
             <p className="text-gray-600">
-              View your current and past rides. Past rides are automatically marked as completed.
+              View your current and past rides. For past rides, mark them as completed or report any issues.
             </p>
           </div>
           <Button
@@ -267,6 +388,24 @@ const RideHistory = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Report Issue Modal */}
+      <ReportIssueModal
+        isOpen={!!reportingIssueId}
+        onClose={() => {
+          setReportingIssueId(null);
+          setReportingRideInfo(null);
+        }}
+        onSubmit={async (description) => {
+          if (reportingIssueId) {
+            await reportIssueMutation.mutateAsync({
+              historyId: reportingIssueId,
+              issueDescription: description,
+            });
+          }
+        }}
+        rideInfo={reportingRideInfo || { origin: "", destination: "", driverName: "" }}
+      />
     </div>
   );
 };

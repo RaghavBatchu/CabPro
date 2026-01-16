@@ -1,5 +1,3 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
-
 export interface HistoryEntry {
   _id: string;
   userId: string;
@@ -11,6 +9,9 @@ export interface HistoryEntry {
   time: string;
   driverName: string;
   status: "completed" | "cancelled";
+  completionStatus: "pending" | "completed_safely" | "issue_reported";
+  issueDescription?: string;
+  issueReportedAt?: string;
   participants: string[];
   participantsInfo?: Array<{ _id: string; fullName: string; whatsappNumber: string }>;
   createdAt: string;
@@ -45,6 +46,37 @@ export async function addRideToHistory(payload: AddToHistoryPayload): Promise<Hi
   });
   if (!res.ok) {
     const err: any = new Error(`Failed to add ride to history: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function markRideCompleted(historyId: string): Promise<HistoryEntry> {
+  const url = `${API_BASE}/api/history/${historyId}/complete`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err: any = new Error(`Failed to mark ride as completed: ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+export async function reportRideIssue(historyId: string, issueDescription: string): Promise<HistoryEntry> {
+  const url = `${API_BASE}/api/history/${historyId}/report-issue`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ issueDescription }),
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err: any = new Error(`Failed to report issue: ${res.status}`);
     err.status = res.status;
     throw err;
   }
@@ -107,3 +139,5 @@ export function categorizeRides(rides: HistoryEntry[]) {
     { current: [] as HistoryEntry[], past: [] as HistoryEntry[] }
   );
 }
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
