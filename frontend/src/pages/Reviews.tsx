@@ -4,16 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Star } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Star, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { fetchReviews, createReview, Review } from "@/services/reviewApi";
+import { fetchReviews, createReview, Review, fetchIssueReports } from "@/services/reviewApi";
 import { fetchUserByEmail } from "@/services/userApi";
 import { useUser } from "@clerk/clerk-react";
 
 const Reviews = () => {
   const { user } = useUser();
+  const [activeTab, setActiveTab] = useState("reviews");
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [issueReports, setIssueReports] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,10 +32,15 @@ const Reviews = () => {
     const loadReviews = async () => {
       try {
         setLoading(true);
-        const data = await fetchReviews();
-        setReviews(data.reviews);
-        setAverageRating(parseFloat(data.average));
-        setTotalReviews(data.total);
+        const [reviewsData, issuesData] = await Promise.all([
+          fetchReviews(),
+          fetchIssueReports(),
+        ]);
+        const regularReviews = reviewsData.reviews.filter((r: Review) => !r.isIssueReport);
+        setReviews(regularReviews);
+        setIssueReports(issuesData.issues);
+        setAverageRating(parseFloat(reviewsData.average));
+        setTotalReviews(regularReviews.length);
       } catch (error) {
         console.error("Failed to load reviews:", error);
         toast.error("Failed to load reviews");
@@ -75,9 +83,10 @@ const Reviews = () => {
       
       // Refresh reviews to get updated data
       const data = await fetchReviews();
-      setReviews(data.reviews);
+      const regularReviews = data.reviews.filter((r: Review) => !r.isIssueReport);
+      setReviews(regularReviews);
       setAverageRating(parseFloat(data.average));
-      setTotalReviews(data.total);
+      setTotalReviews(regularReviews.length);
       
       setNewReview({ reviewerName: "", rating: 0, comment: "" });
       toast.success("Review submitted successfully!");
@@ -126,98 +135,151 @@ const Reviews = () => {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        <Card className="ride-card md:col-span-1 bg-primary/5 border-primary/20">
-          <CardContent className="pt-6 text-center">
-            <div className="text-5xl font-bold text-primary mb-2">
-              {averageRating.toFixed(1)}
-            </div>
-            <StarRating rating={Math.round(averageRating)} />
-            <p className="text-sm text-muted-foreground mt-2">
-              Based on {totalReviews} reviews
-            </p>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="reviews">
+            Reviews ({totalReviews})
+          </TabsTrigger>
+          <TabsTrigger value="issues" className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Issues ({issueReports.length})
+          </TabsTrigger>
+        </TabsList>
 
-        <Card className="ride-card md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-xl">Write a Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmitReview} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="reviewerName">Your Name</Label>
-                <Input
-                  id="reviewerName"
-                  value={newReview.reviewerName}
-                  onChange={(e) =>
-                    setNewReview({ ...newReview, reviewerName: e.target.value })
-                  }
-                  placeholder="Enter your name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Rating</Label>
-                <StarRating
-                  rating={newReview.rating}
-                  interactive
-                  onRate={(rating) => setNewReview({ ...newReview, rating })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="comment">Comment</Label>
-                <Textarea
-                  id="comment"
-                  value={newReview.comment}
-                  onChange={(e) =>
-                    setNewReview({ ...newReview, comment: e.target.value })
-                  }
-                  placeholder="Share your experience..."
-                  rows={4}
-                />
-              </div>
-
-              <Button type="submit" className="btn-primary w-full" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit Review"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-foreground">All Reviews</h2>
-        {loading ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Loading reviews...</p>
-          </div>
-        ) : reviews.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No reviews yet. Be the first to share your experience!</p>
-          </div>
-        ) : (
-          reviews.map((review) => (
-            <Card key={review._id} className="ride-card">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-foreground">
-                      {review.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <StarRating rating={review.rating} />
+        <TabsContent value="reviews" className="mt-6">
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <Card className="ride-card md:col-span-1 bg-primary/5 border-primary/20">
+              <CardContent className="pt-6 text-center">
+                <div className="text-5xl font-bold text-primary mb-2">
+                  {averageRating.toFixed(1)}
                 </div>
-                <p className="text-card-foreground">{review.comment}</p>
+                <StarRating rating={Math.round(averageRating)} />
+                <p className="text-sm text-muted-foreground mt-2">
+                  Based on {totalReviews} reviews
+                </p>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+
+            <Card className="ride-card md:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-xl">Write a Review</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmitReview} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reviewerName">Your Name</Label>
+                    <Input
+                      id="reviewerName"
+                      value={newReview.reviewerName}
+                      onChange={(e) =>
+                        setNewReview({ ...newReview, reviewerName: e.target.value })
+                      }
+                      placeholder="Enter your name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Rating</Label>
+                    <StarRating
+                      rating={newReview.rating}
+                      interactive
+                      onRate={(rating) => setNewReview({ ...newReview, rating })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="comment">Comment</Label>
+                    <Textarea
+                      id="comment"
+                      value={newReview.comment}
+                      onChange={(e) =>
+                        setNewReview({ ...newReview, comment: e.target.value })
+                      }
+                      placeholder="Share your experience..."
+                      rows={4}
+                    />
+                  </div>
+
+                  <Button type="submit" className="btn-primary w-full" disabled={submitting}>
+                    {submitting ? "Submitting..." : "Submit Review"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground">All Reviews</h2>
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading reviews...</p>
+              </div>
+            ) : reviews.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No reviews yet. Be the first to share your experience!</p>
+              </div>
+            ) : (
+              reviews.map((review) => (
+                <Card key={review._id} className="ride-card">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-foreground">
+                          {review.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <StarRating rating={review.rating} />
+                    </div>
+                    <p className="text-card-foreground">{review.comment}</p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="issues" className="mt-6">
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+              Reported Issues
+            </h2>
+            {loading ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Loading issues...</p>
+              </div>
+            ) : issueReports.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No issues reported yet.</p>
+              </div>
+            ) : (
+              issueReports.map((issue) => (
+                <Card key={issue._id} className="ride-card border-red-200 bg-red-50">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-foreground flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-red-600" />
+                          {issue.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(issue.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-card-foreground bg-white p-3 rounded border border-red-200">
+                      {issue.comment}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

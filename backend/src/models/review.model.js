@@ -18,6 +18,15 @@ const reviewSchema = new mongoose.Schema(
       required: [true, "Comment is required"],
       trim: true,
     },
+    historyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "History",
+      default: null,
+    },
+    isIssueReport: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

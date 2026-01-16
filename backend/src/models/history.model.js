@@ -41,6 +41,19 @@ const historySchema = new mongoose.Schema(
       enum: ["completed", "cancelled"],
       default: "completed",
     },
+    completionStatus: {
+      type: String,
+      enum: ["pending", "completed_safely", "issue_reported"],
+      default: "pending",
+    },
+    issueDescription: {
+      type: String,
+      default: null,
+    },
+    issueReportedAt: {
+      type: Date,
+      default: null,
+    },
     participants: {
       type: [String], // Array of participant user IDs
       default: [],

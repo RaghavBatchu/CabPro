@@ -112,6 +112,54 @@ export const deleteHistory = async (req, res) => {
   }
 };
 
+// @desc    Mark ride as completed safely
+// @route   PATCH /api/history/:id/complete
+export const markRideCompleted = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await History.findByIdAndUpdate(
+      id,
+      { 
+        completionStatus: "completed_safely",
+        issueDescription: null,
+        issueReportedAt: null
+      },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ message: "History entry not found" });
+    res.status(200).json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to mark ride as completed", error: error.message });
+  }
+};
+
+// @desc    Report issue with ride
+// @route   PATCH /api/history/:id/report-issue
+export const reportRideIssue = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { issueDescription } = req.body;
+    
+    if (!issueDescription || issueDescription.trim() === '') {
+      return res.status(400).json({ message: "Issue description is required" });
+    }
+
+    const updated = await History.findByIdAndUpdate(
+      id,
+      { 
+        completionStatus: "issue_reported",
+        issueDescription: issueDescription.trim(),
+        issueReportedAt: new Date()
+      },
+      { new: true }
+    );
+    if (!updated) return res.status(404).json({ message: "History entry not found" });
+    res.status(200).json(updated);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to report issue", error: error.message });
+  }
+};
+
 // @desc    Backfill history for existing rides
 // @route   POST /api/history/backfill/:userId
 export const backfillHistory = async (req, res) => {
