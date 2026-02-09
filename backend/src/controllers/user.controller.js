@@ -1,11 +1,13 @@
-import User from "../models/user.model.js";
+import { eq, or } from "drizzle-orm";
+import { db } from "../../Database/database.js";
+import users from "../models/user.model.js";
 
 // @desc Get all users
 // @route GET /api/users
 export const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
-    res.status(200).json(users);
+    const allUsers = await db.select().from(users);
+    res.status(200).json(allUsers);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch users", error: error.message });
   }
@@ -15,8 +17,8 @@ export const getUsers = async (req, res) => {
 // @route GET /api/users/:id
 export const getUser = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await db.select().from(users).where(eq(users.id, req.params.id)).limit(1);
+    if (user.length ===0) return res.status(404).json({ message: "User not found" });
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch user", error: error.message });
@@ -31,8 +33,8 @@ export const getUserByEmail = async (req, res) => {
     if (!personalEmail) {
       return res.status(400).json({ message: "personalEmail query param is required" });
     }
-    const user = await User.findOne({ personalEmail: String(personalEmail).toLowerCase() });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await db.select().from(users).where(eq(users.personalEmail,personalEmail.toLowerCase())).limit(1);
+    if (user.length === 0) return res.status(404).json({ message: "User not found" });
     res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch user", error: error.message });
@@ -51,23 +53,33 @@ export const createUser = async (req, res) => {
     }
 
     // Check for duplicate emails
-    const existingUser = await User.findOne({
-      $or: [{ personalEmail }, { collegeEmail }],
-    });
-    if (existingUser) {
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          eq(users.personalEmail, personalEmail.toLowerCase()),
+          eq(users.collegeEmail, collegeEmail.toLowerCase())
+        )
+      ).limit(1);
+
+    if (existingUser.length > 0) {
       return res.status(400).json({ message: "User with this email already exists" });
     }
 
-    const newUser = new User({
-      fullName,
-      personalEmail,
-      collegeEmail,
-      whatsappNumber,
-      gender,
-    });
+    const result = await db
+      .insert(users)
+      .values({
+        fullName,
+        personalEmail: personalEmail.toLowerCase(),
+        collegeEmail: collegeEmail.toLowerCase(),
+        whatsappNumber,
+        gender
+      }).returning();
 
-    const savedUser = await newUser.save();
-    res.status(201).json(savedUser);
+    const newUser = result[0];
+
+    res.status(201).json(newUser);
   } catch (error) {
     res.status(500).json({ message: "Failed to create user", error: error.message });
   }
@@ -80,12 +92,9 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    const updatedUser = await User.findByIdAndUpdate(id, updates, {
-      new: true,
-      runValidators: true,
-    });
+    const updatedUser = await db.update(users).set(updates).where(eq(users.id,id)).returning();
 
-    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+    if (updatedUser.length === 0) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json(updatedUser);
   } catch (error) {
@@ -99,8 +108,8 @@ export const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedUser = await User.findByIdAndDelete(id);
-    if (!deletedUser) return res.status(404).json({ message: "User not found" });
+    const deletedUser = await db.delete(users).where(eq(users.id,id)).returning();
+    if (deletedUser.length ===0) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
@@ -116,7 +125,7 @@ export const checkUserExists = async (req, res) => {
     if (!personalEmail) {
       return res.status(400).json({ message: "personalEmail query param is required" });
     }
-    const user = await User.findOne({ personalEmail: String(personalEmail).toLowerCase() });
+    const user = await db.select().from(users).where(eq(users.personalEmail,personalEmail.toLowerCase())).limit(1);
     return res.status(200).json({ exists: Boolean(user) });
   } catch (error) {
     res.status(500).json({ message: "Failed to check user existence", error: error.message });

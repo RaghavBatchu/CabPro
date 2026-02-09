@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { 
+import {
     getUser, 
-    getUsers, 
-    createUser, 
+    getUsers,
+    createUser,
     updateUser, 
     deleteUser,
     checkUserExists,
