@@ -4,7 +4,7 @@ import userRouter from "./routes/user.routes.js";
 import reviewRouter from "./routes/review.routes.js";
 import rideRouter from "./routes/ride.routes.js";
 import historyRouter from "./routes/history.routes.js";
-import connectDB from "../Database/mongodb.js";
+import connectDB from "../Database/database.js";
 
 const app = express();
 

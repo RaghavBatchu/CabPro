@@ -1,42 +1,20 @@
-import mongoose from "mongoose";
+import { integer, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
-const userSchema = new mongoose.Schema({
-  fullName: {
-    type: String,
-    required: [true, "Please provide your full name"],
-    trim: true,
-    minlength: [3, "Name must be at least 3 characters"],
-    maxlength: [100, "Name must be at most 100 characters"],
-  },
-  personalEmail: {
-    type: String,
-    required: [true, "Please provide your personal email"],
-    unique: true,
-    trim: true,
-    lowercase: true,
-    match: [/.+\@.+\..+/, "Please enter a valid email address"],
-  },
-  collegeEmail: {
-    type: String,
-    required: [true, "Please provide your college email"],
-    unique: true,
-    trim: true,
-    lowercase: true,
-    match: [/.+\@.+\..+/, "Please enter a valid college email address"],
-  },
-  whatsappNumber: {
-    type: String,
-    required: [true, "Please provide your WhatsApp number"],
-    match: [/^\d{10,15}$/, "Please enter a valid WhatsApp number"],
-  },
-  gender: {
-    type: String,
-    required: [true, "Please specify your gender"],
-    enum: ["Male", "Female", "Other"],
-  },
-}, { timestamps: true });
+const users = pgTable('users', {
+  id: uuid("id").defaultRandom().primaryKey(),
+  fullName: varchar("full_name", { length: 100 }).notNull(),
+  personalEmail: varchar("personal_email", { length: 150 }).notNull().unique(),
+  collegeEmail: varchar("college_email", { length: 150 }).notNull().unique(),
+  whatsappNumber: varchar("whatsapp_number", { length: 15 }).notNull().unique(),
+  gender: varchar("gender", { length: 10 }).notNull(),
 
-// model name should be singular and capitalized
-const User = mongoose.model("User", userSchema);
+  //reviews
+  averageRating: integer("average_rating").default(0),
+  totalReviews: integer("total_reviews").default(0),
 
-export default User;
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+
+});
+
+export default users;
