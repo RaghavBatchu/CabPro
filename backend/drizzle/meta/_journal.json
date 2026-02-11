@@ -22,6 +22,13 @@
       "when": 1770724161416,
       "tag": "0002_fluffy_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770809757538,
+      "tag": "0003_simple_paibok",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { integer, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { integer, numeric, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 const users = pgTable('users', {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -9,7 +9,7 @@ const users = pgTable('users', {
   gender: varchar("gender", { length: 10 }).notNull(),
 
   //reviews
-  averageRating: integer("average_rating").default(0),
+  averageRating: numeric("average_rating").default(0),
   totalReviews: integer("total_reviews").default(0),
 
   createdAt: timestamp("created_at").defaultNow(),

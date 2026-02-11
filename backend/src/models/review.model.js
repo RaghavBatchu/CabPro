@@ -1,34 +1,45 @@
-import mongoose from "mongoose";
+import {
+  pgTable,
+  uuid,
+  integer,
+  varchar,
+  timestamp,
+  uniqueIndex
+} from "drizzle-orm/pg-core";
 
-const reviewSchema = new mongoose.Schema(
+import users from "./user.model.js";
+import rides from "./ride.model.js";
+
+const reviews = pgTable(
+  "reviews",
   {
-    name: {
-      type: String,
-      required: [true, "Name is required"],
-      trim: true,
-    },
-    rating: {
-      type: Number,
-      required: [true, "Rating is required"],
-      min: 1,
-      max: 5,
-    },
-    comment: {
-      type: String,
-      required: [true, "Comment is required"],
-      trim: true,
-    },
-    historyId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "History",
-      default: null,
-    },
-    isIssueReport: {
-      type: Boolean,
-      default: false,
-    },
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    rideId: uuid("ride_id")
+      .references(() => rides.id)
+      .notNull(),
+
+    reviewerId: uuid("reviewer_id")
+      .references(() => users.id)
+      .notNull(),
+
+    reviewedUserId: uuid("reviewed_user_id")
+      .references(() => users.id)
+      .notNull(),
+
+    rating: integer("rating").notNull(),
+
+    comment: varchar("comment", { length: 500 }),
+
+    createdAt: timestamp("created_at").defaultNow(),
   },
-  { timestamps: true }
+  (table) => ({
+    uniqueReviewPerRide: uniqueIndex("unique_review_per_ride").on(
+      table.rideId,
+      table.reviewerId,
+      table.reviewedUserId
+    ),
+  })
 );
 
-export default mongoose.model("Review", reviewSchema);
+export default reviews;
