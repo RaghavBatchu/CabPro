@@ -1,80 +1,54 @@
-import mongoose from "mongoose";
+import {
+  integer,
+  numeric,
+  pgTable,
+  timestamp,
+  uuid,
+  varchar
+} from "drizzle-orm/pg-core";
+import users from "./user.model.js";
 
-const rideSchema = new mongoose.Schema(
-  {
-    driverId: {
-      type: String,
-      required: [true, "Driver ID is required"],
-    },
-    driverName: {
-      type: String,
-      required: [true, "Driver name is required"],
-      trim: true,
-    },
-    driverPhone: {
-      type: String,
-      required: [true, "Driver phone is required"],
-      trim: true,
-    },
-    origin: {
-      type: String,
-      required: [true, "Origin is required"],
-      trim: true,
-    },
-    destination: {
-      type: String,
-      required: [true, "Destination is required"],
-      trim: true,
-    },
-    date: {
-      type: Date,
-      required: [true, "Date is required"],
-    },
-    time: {
-      type: String, // e.g. "09:30"
-      required: [true, "Time is required"],
-    },
-    // numeric minutes since midnight to make time-range queries easier
-    timeMinutes: {
-      type: Number,
-      required: false,
-      index: true,
-    },
-    // AM or PM label to help display and small filters
-    timePeriod: {
-      type: String,
-      enum: ["AM", "PM"],
-      required: false,
-    },
-    genderPreference: {
-      type: String,
-      enum: ["All", "Male", "Female"],
-      default: "All",
-    },
-    totalSeats: {
-      type: Number,
-      required: [true, "Total seats required"],
-      min: 1,
-      max: 8,
-    },
-    availableSeats: {
-      type: Number,
-      required: [true, "Available seats required"],
-      min: 0,
-    },
-    participants: [{
-      type: String, // User IDs
-    }],
-  },
-  { timestamps: true }
-);
+const rides = pgTable("rides", {
+  id: uuid("id").defaultRandom().primaryKey(),
 
-// Add indexes for better query performance
-rideSchema.index({ origin: 1, destination: 1 });
-rideSchema.index({ date: 1, time: 1 });
-rideSchema.index({ genderPreference: 1 });
-rideSchema.index({ availableSeats: 1 });
-rideSchema.index({ driverId: 1 });
-rideSchema.index({ participants: 1 });
+  createdBy: uuid("created_by")
+    .references(() => users.id)
+    .notNull(),
 
-export default mongoose.model("Ride", rideSchema);
+  // CAR | BIKE | AUTO | BUS
+  rideType: varchar("ride_type", { length: 20 }).notNull(),
+
+  origin: varchar("origin", { length: 255 }).notNull(),
+  destination: varchar("destination", { length: 255 }).notNull(),
+
+  rideDate: timestamp("ride_date").notNull(),
+  rideTime: varchar("ride_time", { length: 10 }).notNull(),
+
+  // system derived later
+  timeMinutes: integer("time_minutes"),
+
+  totalSeats: integer("total_seats").notNull(),
+  availableSeats: integer("available_seats").notNull(),
+
+  // Pricing
+  pricingType: varchar("pricing_type", { length: 20 }).notNull(),
+  pricePerHead: numeric("price_per_head"),
+  basePrice: numeric("base_price"), // nullable ✅
+  pricePerKm: numeric("price_per_km"),
+
+  estimatedDistanceKm: numeric("estimated_distance_km"),
+  estimatedDurationMin: integer("estimated_duration_min"),
+
+  genderPreference: varchar("gender_preference", { length: 20 })
+    .default("ALL"),
+
+  status: varchar("status", { length: 20 })
+    .default("OPEN"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export default rides;
