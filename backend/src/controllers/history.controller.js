@@ -1,4 +1,4 @@
-import { db } from "../db/index.js";
+import { db } from "../../Database/database.js"
 import rides from "../models/ride.model.js";
 import rideRequests from "../models/ride_requests.model.js";
 
