@@ -137,16 +137,14 @@ export const getRideById = async (req, res) => {
         personalEmail: users.personalEmail,
         whatsappNumber: users.whatsappNumber,
         gender: users.gender,
-        status: rideRequests.status
+        averageRating: users.averageRating,
+        totalReviews: users.totalReviews,
+        status: rideRequests.status,
+        requestId: rideRequests.id
       })
       .from(rideRequests)
       .innerJoin(users, eq(rideRequests.userId, users.id))
-      .where(
-        and(
-          eq(rideRequests.rideId, id),
-          eq(rideRequests.status, "ACCEPTED")
-        )
-      );
+      .where(eq(rideRequests.rideId, id));
 
     res.status(200).json({
       ...ride[0],

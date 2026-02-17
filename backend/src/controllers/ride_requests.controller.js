@@ -1,6 +1,7 @@
 import { db } from "../../Database/database.js";
 import rideRequests from "../models/ride_requests.model.js";
 import rides from "../models/ride.model.js";
+import users from "../models/user.model.js";
 
 import { eq, and } from "drizzle-orm";
 
