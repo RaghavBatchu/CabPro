@@ -56,9 +56,40 @@ const RideHistory = () => {
   }, [userData]);
 
   // Categorize rides
-  const upcomingRides = history.filter(r => r.status === "OPEN" || r.status === "STARTED" || r.status === "FULL");
-  const completedRides = history.filter(r => r.status === "COMPLETED");
-  const cancelledRides = history.filter(r => r.status === "CANCELLED");
+  const upcomingRides = history.filter(r => {
+    const isLeader = userData?.id === r.createdBy;
+    const isActive = ["OPEN", "STARTED", "FULL"].includes(r.status);
+    const isParticipating = r.myRequestStatus === "ACCEPTED" || r.myRequestStatus === "PENDING";
+    
+    // Show if ride is active AND (User is leader OR User is participating/pending)
+    // If user cancelled or was rejected, don't show in upcoming
+    return isActive && (isLeader || isParticipating);
+  });
+
+  const completedRides = history.filter(r => {
+    const isLeader = userData?.id === r.createdBy;
+    const isCompleted = r.status === "COMPLETED";
+    const wasAccepted = r.myRequestStatus === "ACCEPTED";
+
+    // Show if ride is completed AND (User is leader OR User was participating/pending)
+    // Including PENDING here because if a ride completes while user was PENDING, it's a past interaction
+    return isCompleted && (isLeader || wasAccepted || r.myRequestStatus === "PENDING");
+  });
+
+  const cancelledRides = history.filter(r => {
+    const isLeader = userData?.id === r.createdBy;
+    
+    // 1. Ride itself was cancelled
+    if (r.status === "CANCELLED") return true;
+
+    // 2. User cancelled their request or was rejected (Ride is NOT cancelled)
+    // Only for non-leaders
+    if (!isLeader && (r.myRequestStatus === "CANCELLED" || r.myRequestStatus === "REJECTED")) {
+      return true;
+    }
+    
+    return false;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -86,19 +117,36 @@ const RideHistory = () => {
     const isLeader = userData?.id === ride.createdBy;
     const canReview = ride.status === "COMPLETED" || ride.status === "CANCELLED";
     
+    let roleLabel = "Participant";
+    let roleIcon = <Users className="h-4 w-4 text-green-600" />;
+
+    if (isLeader) {
+        roleLabel = "Leader";
+        roleIcon = <Car className="h-4 w-4 text-blue-600" />;
+    } else {
+        if (ride.myRequestStatus === "ACCEPTED") {
+            roleLabel = "Joined";
+        } else if (ride.myRequestStatus === "PENDING") {
+            roleLabel = "Requested";
+            roleIcon = <Clock className="h-4 w-4 text-yellow-600" />;
+        } else if (ride.myRequestStatus === "REJECTED") {
+            roleLabel = "Rejected";
+            roleIcon = <Users className="h-4 w-4 text-red-600" />;
+        } else if (ride.myRequestStatus === "CANCELLED") {
+             roleLabel = "Left";
+             roleIcon = <Users className="h-4 w-4 text-gray-500" />;
+        }
+    }
+
     return (
       <Card className="mb-4 ride-card">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
-                {isLeader ? (
-                  <Car className="h-4 w-4 text-blue-600" />
-                ) : (
-                  <Users className="h-4 w-4 text-green-600" />
-                )}
+                {roleIcon}
                 <span className="text-sm font-medium">
-                  {isLeader ? "Leader" : "Participant"}
+                  {roleLabel}
                 </span>
               </div>
               <Badge variant={getStatusColor(ride.status)}>

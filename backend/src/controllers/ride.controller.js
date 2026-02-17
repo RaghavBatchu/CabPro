@@ -3,7 +3,7 @@ import rides from "../models/ride.model.js";
 import rideRequests from "../models/ride_requests.model.js";
 import users from "../models/user.model.js";
 
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, lt, or } from "drizzle-orm";
 
 // POST /api/rides
 export const createRide = async (req, res) => {
@@ -62,6 +62,24 @@ export const createRide = async (req, res) => {
 // GET /api/rides
 export const getRides = async (req, res) => {
   try {
+    // Auto-mark past rides as COMPLETED
+    const now = new Date();
+    // Use UTC date to match how dates are typically stored from frontend
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    await db.update(rides)
+      .set({ status: "COMPLETED" })
+      .where(
+        and(
+          inArray(rides.status, ["OPEN", "FULL"]),
+          or(
+            lt(rides.rideDate, today),
+            and(eq(rides.rideDate, today), lt(rides.timeMinutes, nowMinutes))
+          )
+        )
+      );
+
     const {
       origin,
       destination,
