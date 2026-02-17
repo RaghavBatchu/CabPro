@@ -11,7 +11,7 @@ export interface RideHistoryEntry {
   availableSeats: number;
   pricingType: string;
   genderPreference: string;
-  status: "COMPLETED" | "CANCELLED";
+  status: "OPEN" | "FULL" | "STARTED" | "COMPLETED" | "CANCELLED";
   createdAt: string;
   updatedAt: string;
 }

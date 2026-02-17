@@ -38,9 +38,15 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     destination: initialFilters.destination || "",
     date: initialFilters.date || "",
     time: initialFilters.time || "",
-    genderPreference: "All" as "All" | "Male" | "Female",
+    rideType: "CAR" as "CAR" | "BIKE" | "AUTO" | "BUS",
+    genderPreference: "ALL" as "ALL" | "MALE" | "FEMALE",
     totalSeats: 4,
-    phone: "",
+    pricingType: "PER_HEAD" as "PER_HEAD" | "SHARED" | "FIXED",
+    pricePerHead: "",
+    basePrice: "",
+    pricePerKm: "",
+    estimatedDistanceKm: "",
+    estimatedDurationMin: "",
   });
 
   const todayYmd = (() => {
@@ -53,49 +59,112 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
 
   React.useEffect(() => {
     const email = user?.primaryEmailAddress?.emailAddress;
+    console.log("CreateRideModal - Modal opened, user email:", email);
+    
     if (isOpen && email) {
       const loadUserData = async () => {
         try {
+          console.log("CreateRideModal - Fetching user data for:", email);
           const data = await fetchUserByEmail(email);
+          console.log("CreateRideModal - User data loaded:", data);
           setUserData(data);
-          setFormData(prev => ({
-            ...prev,
-            phone: data.whatsappNumber || "",
-          }));
         } catch (error) {
-          console.error("Failed to load user data:", error);
+          console.error("CreateRideModal - Failed to load user data:", error);
+          toast.error("Failed to load user profile. Please try again.");
         }
       };
       loadUserData();
+    } else {
+      console.log("CreateRideModal - Not loading user data. isOpen:", isOpen, "email:", email);
     }
   }, [isOpen, user?.primaryEmailAddress?.emailAddress]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!userData || !user?.primaryEmailAddress?.emailAddress) {
-      toast.error("User data not available");
+
+    console.log("=== SUBMIT CLICKED ===");
+    console.log("userData at submit time:", userData);
+    console.log("userData?.id:", userData?.id);
+    console.log("user email:", user?.primaryEmailAddress?.emailAddress);
+
+    // Validate user data first - be more lenient
+    if (!userData) {
+      toast.error("User data not loaded. Please refresh and try again.");
+      console.error("userData is missing:", userData);
       return;
     }
 
-    if (!formData.origin || !formData.destination || !formData.date || !formData.time || !formData.phone) {
+    // fetchUserByEmail returns an array, so get the first element
+    const userObj = Array.isArray(userData) ? userData[0] : userData;
+    
+    // Get the user ID, try different possible property names
+    const userId = userObj?.id || (userObj as any)?._id || (userObj as any)?.userId;
+    
+    if (!userId) {
+      toast.error("User ID not found. Please refresh and try again.");
+      console.error("Could not find user ID in:", userData);
+      return;
+    }
+
+    console.log("Using user ID:", userId);
+
+    // Validate required form fields
+    if (!formData.origin || !formData.destination || !formData.date || !formData.time) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Validate pricing based on pricing type
+    if (formData.pricingType === "PER_HEAD" && !formData.pricePerHead) {
+      toast.error("Please enter price per head");
+      return;
+    }
+    if (formData.pricingType === "FIXED" && !formData.basePrice) {
+      toast.error("Please enter base price");
+      return;
+    }
+    if (formData.pricingType === "SHARED" && !formData.pricePerKm) {
+      toast.error("Please enter price per km");
       return;
     }
 
     try {
       setLoading(true);
       const payload: CreateRidePayload = {
-        driverId: userData._id,
-        driverName: userData.fullName,
-        driverPhone: formData.phone,
+        createdBy: userId,
+        rideType: formData.rideType,
         origin: formData.origin,
         destination: formData.destination,
-        date: formData.date,
-        time: formData.time,
-        genderPreference: formData.genderPreference,
+        rideDate: formData.date,
+        rideTime: formData.time,
         totalSeats: formData.totalSeats,
+        pricingType: formData.pricingType,
+        genderPreference: formData.genderPreference,
       };
+
+      // Add optional pricing fields based on pricing type
+      if (formData.pricePerHead) {
+        payload.pricePerHead = parseFloat(formData.pricePerHead);
+      }
+      if (formData.basePrice) {
+        payload.basePrice = parseFloat(formData.basePrice);
+      }
+      if (formData.pricePerKm) {
+        payload.pricePerKm = parseFloat(formData.pricePerKm);
+      }
+
+      // Add optional distance and duration estimates
+      if (formData.estimatedDistanceKm) {
+        payload.estimatedDistanceKm = parseFloat(formData.estimatedDistanceKm);
+      }
+      if (formData.estimatedDurationMin) {
+        payload.estimatedDurationMin = parseInt(formData.estimatedDurationMin);
+      }
+
+      console.log("=== CREATE RIDE PAYLOAD ===");
+      console.log(JSON.stringify(payload, null, 2));
+      console.log("=== FORM DATA ===");
+      console.log(JSON.stringify(formData, null, 2));
 
       await createRide(payload);
       toast.success("Ride created successfully! You are now the ride leader.");
@@ -165,22 +234,30 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="phone">Phone Number *</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Enter your phone number"
-                  required
-                />
+                <Label htmlFor="rideType">Ride Type *</Label>
+                <Select
+                  value={formData.rideType}
+                  onValueChange={(value: "CAR" | "BIKE" | "AUTO" | "BUS") => 
+                    setFormData(prev => ({ ...prev, rideType: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CAR">Car</SelectItem>
+                    <SelectItem value="BIKE">Bike</SelectItem>
+                    <SelectItem value="AUTO">Auto</SelectItem>
+                    <SelectItem value="BUS">Bus</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <Label htmlFor="genderPreference">Gender Preference</Label>
                 <Select
                   value={formData.genderPreference}
-                  onValueChange={(value: "All" | "Male" | "Female") => 
+                  onValueChange={(value: "ALL" | "MALE" | "FEMALE") => 
                     setFormData(prev => ({ ...prev, genderPreference: value }))
                   }
                 >
@@ -188,9 +265,9 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="All">All</SelectItem>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="ALL">All</SelectItem>
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -216,6 +293,90 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <SelectItem value="8">8</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="pricingType">Pricing Type *</Label>
+                <Select
+                  value={formData.pricingType}
+                  onValueChange={(value: "PER_HEAD" | "SHARED" | "FIXED") => 
+                    setFormData(prev => ({ ...prev, pricingType: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PER_HEAD">Per Head</SelectItem>
+                    <SelectItem value="SHARED">Shared (Per KM)</SelectItem>
+                    <SelectItem value="FIXED">Fixed Price</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.pricingType === "PER_HEAD" && (
+                <div>
+                  <Label htmlFor="pricePerHead">Price Per Head *</Label>
+                  <Input
+                    id="pricePerHead"
+                    type="number"
+                    step="0.01"
+                    value={formData.pricePerHead}
+                    onChange={(e) => setFormData(prev => ({ ...prev, pricePerHead: e.target.value }))}
+                    placeholder="Enter price per head"
+                  />
+                </div>
+              )}
+
+              {formData.pricingType === "FIXED" && (
+                <div>
+                  <Label htmlFor="basePrice">Base Price *</Label>
+                  <Input
+                    id="basePrice"
+                    type="number"
+                    step="0.01"
+                    value={formData.basePrice}
+                    onChange={(e) => setFormData(prev => ({ ...prev, basePrice: e.target.value }))}
+                    placeholder="Enter fixed price"
+                  />
+                </div>
+              )}
+
+              {formData.pricingType === "SHARED" && (
+                <div>
+                  <Label htmlFor="pricePerKm">Price Per KM *</Label>
+                  <Input
+                    id="pricePerKm"
+                    type="number"
+                    step="0.01"
+                    value={formData.pricePerKm}
+                    onChange={(e) => setFormData(prev => ({ ...prev, pricePerKm: e.target.value }))}
+                    placeholder="Enter price per km"
+                  />
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="estimatedDistanceKm">Estimated Distance (km)</Label>
+                <Input
+                  id="estimatedDistanceKm"
+                  type="number"
+                  step="0.1"
+                  value={formData.estimatedDistanceKm}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedDistanceKm: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="estimatedDurationMin">Estimated Duration (minutes)</Label>
+                <Input
+                  id="estimatedDurationMin"
+                  type="number"
+                  value={formData.estimatedDurationMin}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedDurationMin: e.target.value }))}
+                  placeholder="Optional"
+                />
               </div>
             </div>
 

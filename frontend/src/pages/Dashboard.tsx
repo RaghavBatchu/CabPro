@@ -13,8 +13,9 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
-import { fetchRides, joinRide, leaveRide, Ride, RideFilters, fetchRideSuggestions } from "@/services/rideApi";
-import { deleteRide as apiDeleteRide } from "@/services/rideApi";
+import { fetchRides, Ride, RideFilters } from "@/services/rideApi";
+import { cancelRide } from "@/services/rideApi";
+import { sendJoinRequest, rejectRideRequest, cancelRideRequest } from "@/services/ride_requestsApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
 
@@ -30,9 +31,6 @@ const Dashboard = () => {
   const [timeFilter, setTimeFilter] = useState<string>("");
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
-  const [suggestions, setSuggestions] = useState<Ride[]>([]);
-  const [suggestionLoading, setSuggestionLoading] = useState(false);
-  const [suggestionWindow, setSuggestionWindow] = useState<string | null>(null);
   const [originOptions, setOriginOptions] = useState<string[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
 
@@ -58,8 +56,10 @@ const Dashboard = () => {
         if (user?.primaryEmailAddress?.emailAddress && !effectiveUserData) {
           try {
             const userInfo = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
-            setUserData(userInfo);
-            effectiveUserData = userInfo;
+            // fetchUserByEmail returns an array, get the first element
+            const userObj = Array.isArray(userInfo) ? userInfo[0] : userInfo;
+            setUserData(userObj);
+            effectiveUserData = userObj;
           } catch (err) {
             console.error('Failed to load user data:', err);
           }
@@ -71,11 +71,7 @@ const Dashboard = () => {
         if (destinationFilter !== "all") filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
-        // Normalize gender filter: map UI value "Any" to backend "All"
-        if (genderFilter !== "all") {
-          const normalizedGender = genderFilter === "Any" ? "All" : genderFilter;
-          filters.genderPreference = normalizedGender;
-        }
+        // Gender preference is part of the Ride model, not a filter
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
         // Ensure we include the current user's gender so backend can filter rides
         if (effectiveUserData?.gender) {
@@ -84,7 +80,6 @@ const Dashboard = () => {
 
     const ridesData = await fetchRides(filters);
     setRides(ridesData);
-    setSuggestions([]);
     const newOrigins = Array.from(new Set(ridesData.map((r:any) => r.origin))).filter(Boolean);
     const newDestinations = Array.from(new Set(ridesData.map((r:any) => r.destination))).filter(Boolean);
     if (newOrigins.length > 0) setOriginOptions(newOrigins);
@@ -107,38 +102,6 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, [user, userData, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
 
-  // When there are no rides and user provided date+time filters, request suggestions
-  useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (loading) return;
-      if (rides.length > 0) return;
-      if (!dateFilter || !timeFilter) return;
-      try {
-        setSuggestionLoading(true);
-        setSuggestions([]);
-        // compute window for UI
-        const [h, m] = timeFilter.split(':').map(n => parseInt(n, 10));
-        const reqMinutes = (h || 0) * 60 + (isNaN(m) ? 0 : m);
-        const startMin = reqMinutes - 30;
-        const endMin = reqMinutes + 30;
-        const fmt = (minutes: number) => {
-          const mm = ((minutes % 60) + 60) % 60;
-          const hh = Math.floor(((minutes - mm) / 60 + 24) % 24);
-          const period = hh >= 12 ? 'PM' : 'AM';
-          const displayHour = hh % 12 === 0 ? 12 : hh % 12;
-          return `${displayHour}:${mm.toString().padStart(2, '0')} ${period}`;
-        };
-        setSuggestionWindow(`${fmt(startMin)} - ${fmt(endMin)}`);
-        const s = await fetchRideSuggestions({ origin: originFilter !== 'all' ? originFilter : undefined, destination: destinationFilter !== 'all' ? destinationFilter : undefined, date: dateFilter, time: timeFilter, windowMinutes: 30 });
-        setSuggestions(s);
-      } catch (err) {
-        console.error('Failed to fetch suggestions:', err);
-      } finally {
-        setSuggestionLoading(false);
-      }
-    };
-    fetchSuggestions();
-  }, [loading, rides, dateFilter, timeFilter, originFilter, destinationFilter]);
 
   const filteredRides = rides;
 
@@ -149,39 +112,74 @@ const Dashboard = () => {
     }
 
     try {
-      const updatedRide = await joinRide(rideId, userData._id);
-      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
-      toast.success("Joined ride successfully!");
+      await sendJoinRequest({ rideId, userId: userData._id });
+      toast.success("Join request sent successfully! Waiting for leader approval.");
+      // Optionally reload rides to show updated request status
+      const filters: RideFilters = {};
+      if (originFilter !== "all") filters.origin = originFilter;
+      if (destinationFilter !== "all") filters.destination = destinationFilter;
+      if (dateFilter) filters.date = dateFilter;
+      if (timeFilter) filters.time = timeFilter;
+      // Gender preference is part of the Ride model, not a filter
+      if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+      if (userData?.gender) filters.userGender = userData.gender;
+      const ridesData = await fetchRides(filters);
+      setRides(ridesData);
     } catch (error: any) {
-      console.error("Failed to join ride:", error);
-      toast.error(error.message || "Failed to join ride");
+      console.error("Failed to send join request:", error);
+      toast.error(error.message || "Failed to send join request");
     }
   };
 
-  const handleLeaveRide = async (rideId: string) => {
+  const handleLeaveRide = async (requestId: string) => {
     if (!userData) {
       toast.error("User data not available");
       return;
     }
 
     try {
-      const updatedRide = await leaveRide(rideId, userData._id);
-      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
-      toast.info("Left ride successfully");
+      await cancelRideRequest(requestId);
+      toast.info("Request cancelled successfully");
+      // Reload rides to show updated status
+      const filters: RideFilters = {};
+      if (originFilter !== "all") filters.origin = originFilter;
+      if (destinationFilter !== "all") filters.destination = destinationFilter;
+      if (dateFilter) filters.date = dateFilter;
+      if (timeFilter) filters.time = timeFilter;
+      // Gender preference is part of the Ride model, not a filter
+      if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+      if (userData?.gender) filters.userGender = userData.gender;
+      const ridesData = await fetchRides(filters);
+      setRides(ridesData);
     } catch (error: any) {
-      console.error("Failed to leave ride:", error);
-      toast.error(error.message || "Failed to leave ride");
+      console.error("Failed to cancel request:", error);
+      toast.error(error.message || "Failed to cancel request");
     }
   };
 
-  const handleRemoveParticipant = async (rideId: string, participantId: string) => {
+  const handleRemoveParticipant = async (requestId: string) => {
+    if (!userData) {
+      toast.error("User data not available");
+      return;
+    }
+
     try {
-      const updatedRide = await leaveRide(rideId, participantId);
-      setRides(prev => prev.map(ride => ride._id === rideId ? updatedRide : ride));
-      toast.info("Participant removed");
+      await rejectRideRequest(requestId, { leaderId: userData._id });
+      toast.info("Participant request rejected");
+      // Reload rides to show updated status
+      const filters: RideFilters = {};
+      if (originFilter !== "all") filters.origin = originFilter;
+      if (destinationFilter !== "all") filters.destination = destinationFilter;
+      if (dateFilter) filters.date = dateFilter;
+      if (timeFilter) filters.time = timeFilter;
+      // Gender preference is part of the Ride model, not a filter
+      if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
+      if (userData?.gender) filters.userGender = userData.gender;
+      const ridesData = await fetchRides(filters);
+      setRides(ridesData);
     } catch (error: any) {
-      console.error("Failed to remove participant:", error);
-      toast.error(error.message || "Failed to remove participant");
+      console.error("Failed to reject participant:", error);
+      toast.error(error.message || "Failed to reject participant");
     }
   };
 
@@ -192,8 +190,8 @@ const Dashboard = () => {
     }
 
     try {
-      await apiDeleteRide(rideId, userData._id);
-      setRides(prev => prev.filter(r => r._id !== rideId));
+      await cancelRide(rideId, userData._id);
+      setRides(prev => prev.filter(r => r.id !== rideId));
       toast.success("Ride cancelled successfully");
     } catch (error: any) {
       console.error("Failed to delete ride:", error);
@@ -210,8 +208,10 @@ const Dashboard = () => {
         if (!effectiveUserData && user?.primaryEmailAddress?.emailAddress) {
           try {
             const ud = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
-            setUserData(ud);
-            effectiveUserData = ud;
+            // fetchUserByEmail returns an array, get the first element
+            const userObj = Array.isArray(ud) ? ud[0] : ud;
+            setUserData(userObj);
+            effectiveUserData = userObj;
           } catch (err) {
             console.error('Failed to fetch user data during reload:', err);
           }
@@ -222,10 +222,7 @@ const Dashboard = () => {
         if (destinationFilter !== "all") filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
-        if (genderFilter !== "all") {
-          const normalizedGender = genderFilter === "Any" ? "All" : genderFilter;
-          filters.genderPreference = normalizedGender;
-        }
+        // Gender preference is part of the Ride model, not a filter
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
         if (effectiveUserData?.gender) {
           filters.userGender = effectiveUserData.gender;
@@ -371,47 +368,17 @@ const Dashboard = () => {
         ) : filteredRides.length > 0 ? (
           filteredRides.map((ride) => (
               <RideCard
-                key={ride._id}
+                key={ride.id}
                 ride={ride}
-                currentUserId={userData?._id || ""}
+                currentUserId={userData?.id || ""}
                 onJoinRide={handleJoinRide}
                 onLeaveRide={handleLeaveRide}
-                onRemoveParticipant={handleRemoveParticipant}
                 onDeleteRide={handleDeleteRide}
               />
           ))
         ) : (
           <div className="col-span-full text-center py-12">
             <p className="text-lg text-muted-foreground mb-4">No rides match your filters</p>
-            {dateFilter && timeFilter ? (
-              <div className="mb-6">
-                <h3 className="text-md font-semibold mb-3">Suggested close matches (±30 minutes)</h3>
-                {suggestionLoading ? (
-                  <p className="text-sm text-muted-foreground">Searching for nearby times... {suggestionWindow ? `Showing rides between ${suggestionWindow}` : ''}</p>
-                ) : (
-                  <>
-                    {suggestionWindow && <p className="text-sm text-muted-foreground mb-2">Showing rides between {suggestionWindow}</p>}
-                    {suggestions.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No nearby times found.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                        {suggestions.map(s => (
-                          <RideCard
-                            key={s._id}
-                            ride={s}
-                            currentUserId={userData?._id || ""}
-                            onJoinRide={handleJoinRide}
-                            onLeaveRide={handleLeaveRide}
-                            onRemoveParticipant={handleRemoveParticipant}
-                            onDeleteRide={handleDeleteRide}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ) : null}
             <Button 
               onClick={() => setShowCreateModal(true)}
               className="btn-primary"

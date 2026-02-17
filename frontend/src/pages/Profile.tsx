@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { User } from "@/components/data/mockData";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,15 @@ import { User as UserIcon, Mail, Phone, UserCircle } from "lucide-react";
 import { fetchUserByEmail, updateUser as updateUserApi, createUser } from "@/services/userApi";
 import { useUser as useClerkUser } from "@clerk/clerk-react";
 
+// Local User type for profile form
+interface User {
+  id: string;
+  fullName: string;
+  email: string;
+  whatsapp: string;
+  gender: "Male" | "Female";
+}
+
 const Profile = () => {
   const [user, setUser] = useState<User>({
     id: "",
@@ -30,7 +39,7 @@ const Profile = () => {
   const { user: clerkUser } = useClerkUser();
 
   const handleChange = (field: keyof User, value: string) => {
-    setUser((prev) => ({ ...prev, [field]: value }));
+    setUser((prev: User) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
@@ -75,7 +84,9 @@ const Profile = () => {
 
         let dto;
         try {
-          dto = await fetchUserByEmail(personalEmail);
+          const response = await fetchUserByEmail(personalEmail);
+          // fetchUserByEmail returns an array, get the first element
+          dto = Array.isArray(response) ? response[0] : response;
         } catch (err: any) {
           if (err?.status === 404) {
             dto = await createUser({
@@ -95,9 +106,9 @@ const Profile = () => {
           email: dto.collegeEmail,
           whatsapp: dto.whatsappNumber || "",
           gender: (dto.gender === "Male" || dto.gender === "Female" ? dto.gender : "Male"),
-          id: dto._id,
+          id: dto.id,
         } as any);
-        setUserId(dto._id);
+        setUserId(dto.id);
       } catch (_e) {
         // ignore: keep empty UI if backend not available
       }

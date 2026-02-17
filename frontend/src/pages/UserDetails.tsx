@@ -17,15 +17,21 @@ const UserDetails = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If user already exists, skip this page
+    // If user already exists, redirect to dashboard
     const email = user?.primaryEmailAddress?.emailAddress;
     if (!email) return;
+    
     const checkExisting = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/users/exists/check?personalEmail=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (data?.exists) navigate("/dashboard", { replace: true });
-      } catch {}
+        const res = await fetch(`${API_BASE}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          // User exists, redirect to dashboard
+          navigate("/dashboard", { replace: true });
+        }
+      } catch (error) {
+        // User doesn't exist or error occurred, stay on this page to allow registration
+        console.log("User not found, showing registration form");
+      }
     };
     checkExisting();
   }, [user, navigate]);

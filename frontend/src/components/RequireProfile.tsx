@@ -19,12 +19,15 @@ const RequireProfile = ({ children }: PropsWithChildren) => {
         return;
       }
       try {
-        const res = await fetch(`${API_BASE}/api/users/exists/check?personalEmail=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (!data?.exists) {
+        const res = await fetch(`${API_BASE}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          // User doesn't exist, redirect to complete profile
           navigate("/user-details", { replace: true });
-          return;
         }
+        // If user exists (res.ok), allow them to continue to the page
+      } catch (error) {
+        // On error, assume user doesn't exist and redirect to complete profile
+        navigate("/user-details", { replace: true });
       } finally {
         setChecking(false);
       }

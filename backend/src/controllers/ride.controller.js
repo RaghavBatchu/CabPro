@@ -19,6 +19,8 @@ export const createRide = async (req, res) => {
       pricePerHead,
       basePrice,
       pricePerKm,
+      estimatedDistanceKm,
+      estimatedDurationMin,
       genderPreference
     } = req.body;
 
@@ -43,6 +45,8 @@ export const createRide = async (req, res) => {
       pricePerHead,
       basePrice,
       pricePerKm,
+      estimatedDistanceKm,
+      estimatedDurationMin,
       genderPreference: genderPreference || "ALL",
       status: "OPEN"
     }).returning();

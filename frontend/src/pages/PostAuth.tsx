@@ -17,15 +17,13 @@ const PostAuth = () => {
     }
     const check = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/users/exists/check?personalEmail=${encodeURIComponent(email)}`);
-        if (!res.ok) throw new Error("Failed to check user");
-        const data = await res.json();
-        if (data?.exists) {
+        const res = await fetch(`${API_BASE}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`);
+        if (res.ok) {
           navigate("/dashboard", { replace: true });
         } else {
           navigate("/user-details", { replace: true });
         }
-      } catch {
+      } catch (error) {
         navigate("/user-details", { replace: true });
       }
     };

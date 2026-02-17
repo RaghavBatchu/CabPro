@@ -11,18 +11,13 @@ export const getUserHistory = async (req, res) => {
 
   try {
 
-    // 1️⃣ Leader history
+    // 1️⃣ Leader history - all rides created by user
     const leaderRides = await db
       .select()
       .from(rides)
-      .where(
-        and(
-          eq(rides.createdBy, userId),
-          inArray(rides.status, ["COMPLETED", "CANCELLED"])
-        )
-      );
+      .where(eq(rides.createdBy, userId));
 
-    // 2️⃣ Participant history
+    // 2️⃣ Participant history - all accepted ride requests
     const participantRides = await db
       .select({
         ride: rides
@@ -32,8 +27,7 @@ export const getUserHistory = async (req, res) => {
       .where(
         and(
           eq(rideRequests.userId, userId),
-          eq(rideRequests.status, "ACCEPTED"),
-          inArray(rides.status, ["COMPLETED", "CANCELLED"])
+          eq(rideRequests.status, "ACCEPTED")
         )
       );
 

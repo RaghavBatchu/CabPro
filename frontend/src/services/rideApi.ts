@@ -36,6 +36,8 @@ export interface CreateRidePayload {
   pricePerHead?: number;
   basePrice?: number;
   pricePerKm?: number;
+  estimatedDistanceKm?: number;
+  estimatedDurationMin?: number;
   genderPreference?: "ALL" | "MALE" | "FEMALE";
 }
 
