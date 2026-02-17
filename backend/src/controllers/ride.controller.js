@@ -250,7 +250,7 @@ export const completeRide = async (req, res) => {
 // DELETE /api/rides/:id
 export const cancelRide = async (req, res) => {
   const { id } = req.params;
-  const { leaderId } = req.body;
+  const { leaderId, reason } = req.body;
 
   try {
     const ride = await db
@@ -264,8 +264,15 @@ export const cancelRide = async (req, res) => {
       return res.status(403).json({ message: "Only leader can cancel ride" });
     }
 
+    if (ride[0].status === "CANCELLED" || ride[0].status === "COMPLETED") {
+      return res.status(400).json({ message: "Ride is already finalized" });
+    }
+
     await db.update(rides)
-      .set({ status: "CANCELLED" })
+      .set({
+        status: "CANCELLED",
+        cancellationReason: reason
+      })
       .where(eq(rides.id, id));
 
     res.status(200).json({ message: "Ride cancelled" });

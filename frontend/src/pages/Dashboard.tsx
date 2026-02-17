@@ -223,14 +223,14 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteRide = async (rideId: string) => {
+  const handleDeleteRide = async (rideId: string, reason?: string) => {
     if (!userData) {
       toast.error("User data not available");
       return;
     }
 
     try {
-      await cancelRide(rideId, userData._id);
+      await cancelRide(rideId, userData.id, reason);
       setRides(prev => prev.filter(r => r.id !== rideId));
       toast.success("Ride cancelled successfully");
     } catch (error: any) {

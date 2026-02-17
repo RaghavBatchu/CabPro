@@ -112,13 +112,15 @@ export const completeRide = async (
 };
 
 // Cancel ride (Leader only)
-// DELETE /api/rides/:id
+// POST /api/rides/:id/cancel
 export const cancelRide = async (
   rideId: string,
-  leaderId: string
+  leaderId: string,
+  reason?: string
 ): Promise<{ message: string }> => {
-  const res = await api.delete(`/rides/${rideId}`, {
-    data: { leaderId }, // send leaderId in body
+  const res = await api.post(`/rides/${rideId}/cancel`, {
+    leaderId,
+    reason,
   });
 
   return res.data;

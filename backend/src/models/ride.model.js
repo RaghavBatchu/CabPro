@@ -45,6 +45,8 @@ const rides = pgTable("rides", {
   status: varchar("status", { length: 20 })
     .default("OPEN"),
 
+  cancellationReason: varchar("cancellation_reason", { length: 255 }),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

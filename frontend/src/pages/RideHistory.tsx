@@ -185,6 +185,13 @@ const RideHistory = () => {
                 Pricing: <span className="font-medium capitalize">{ride.pricingType}</span>
               </div>
             )}
+
+            {ride.status === "CANCELLED" && (
+               <div className="mt-3 p-3 bg-red-50 rounded-md border border-red-100 text-sm">
+                 <span className="font-semibold text-red-800 block mb-1">Ride Cancelled</span>
+                 <p className="text-red-700 italic">"{ride.cancellationReason || "No reason provided"}"</p>
+               </div>
+            )}
             
             {/* Review Button */}
             <div className="mt-4">

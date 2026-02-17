@@ -15,6 +15,7 @@ export interface RideHistoryEntry {
   createdAt: string;
   updatedAt: string;
   myRequestStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+  cancellationReason?: string;
 }
 
 export interface UserHistoryResponse {

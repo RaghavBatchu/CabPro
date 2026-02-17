@@ -36,7 +36,7 @@ rideRouter.post("/:id/start", startRide);
 rideRouter.post("/:id/complete", completeRide);
 
 // Cancel ride (Leader only)
-// DELETE /api/rides/:id
-rideRouter.delete("/:id", cancelRide);
+// POST /api/rides/:id/cancel
+rideRouter.post("/:id/cancel", cancelRide);
 
 export default rideRouter;

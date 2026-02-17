@@ -25,7 +25,7 @@ interface RideCardProps {
   currentUserId: string;
   onJoinRide: (rideId: string) => void;
   onLeaveRide: (rideId: string) => void;
-  onDeleteRide?: (rideId: string) => void;
+  onDeleteRide?: (rideId: string, reason?: string) => void;
   requestStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | null;
   rejectionReason?: string;
 }
@@ -312,13 +312,15 @@ export const RideCard = ({
                 className="flex-1 shadow-sm hover:shadow-md transition-all duration-200"
                 onClick={() => {
                   if (typeof onDeleteRide === "function") {
-                    // confirm before deleting
-                    if (
-                      window.confirm(
-                        "Are you sure you want to cancel this ride? This cannot be undone."
-                      )
-                    ) {
-                      onDeleteRide(ride.id);
+                    const reason = window.prompt(
+                      "WARNING: You are about to cancel this ride.\n\nThis will notify all participants and cannot be undone.\n\nPlease provide a reason for cancellation:"
+                    );
+                    if (reason !== null) {
+                      if (!reason.trim()) {
+                        alert("A reason is required to cancel the ride.");
+                        return;
+                      }
+                      onDeleteRide(ride.id, reason);
                     }
                   }
                 }}
