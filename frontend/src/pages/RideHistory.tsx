@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { fetchUserHistory, RideHistoryEntry } from "@/services/historyApi";
 import { fetchUserByEmail } from "@/services/userApi";
+import { RideReviewListModal } from "@/components/RideReviewListModal";
 
 const RideHistory = () => {
   const { user } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("all");
   const [userData, setUserData] = useState<any>(null);
+  const [reviewModalRideId, setReviewModalRideId] = useState<string | null>(null);
   const [history, setHistory] = useState<RideHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -115,7 +117,23 @@ const RideHistory = () => {
 
   const RideCard = ({ ride }: { ride: RideHistoryEntry }) => {
     const isLeader = userData?.id === ride.createdBy;
-    const canReview = ride.status === "COMPLETED" || ride.status === "CANCELLED";
+    const isRideFinalized = ["COMPLETED", "CANCELLED"].includes(ride.status);
+    const myStatus = ride.myRequestStatus;
+
+    // Review allowed if:
+    // 1. Leader (Finalized ride)
+    // 2. Participant ACCEPTED (Finalized ride)
+    // 3. User REJECTED (Anytime)
+    // 4. User CANCELLED/LEFT (Anytime)
+    // 5. Ride CANCELLED (Any participant except PENDING?)
+    const canReview = 
+        (isLeader && isRideFinalized) ||
+        (!isLeader && (
+            (myStatus === "ACCEPTED" && isRideFinalized) ||
+            myStatus === "REJECTED" ||
+            myStatus === "CANCELLED" || 
+            (ride.status === "CANCELLED" && myStatus !== "PENDING")
+        ));
     
     let roleLabel = "Participant";
     let roleIcon = <Users className="h-4 w-4 text-green-600" />;
@@ -193,18 +211,29 @@ const RideHistory = () => {
                </div>
             )}
             
-            {/* Review Button */}
-            <div className="mt-4">
+            {/* Review Actions */}
+            <div className="mt-4 space-y-2">
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full"
                 disabled={!canReview}
-                onClick={() => navigate('/reviews')}
+                onClick={() => navigate(`/reviews?rideId=${ride.id}`)}
               >
                 <Star className="h-4 w-4 mr-2" />
                 {canReview ? "Leave Review" : "Review Available After Completion"}
               </Button>
+
+              {isRideFinalized && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setReviewModalRideId(ride.id)}
+                >
+                  Read Reviews
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -314,6 +343,11 @@ const RideHistory = () => {
           )}
         </TabsContent>
       </Tabs>
+      <RideReviewListModal 
+        isOpen={!!reviewModalRideId} 
+        rideId={reviewModalRideId} 
+        onClose={() => setReviewModalRideId(null)} 
+      />
     </div>
   );
 };

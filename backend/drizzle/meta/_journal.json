@@ -50,6 +50,13 @@
       "when": 1771359392787,
       "tag": "0006_regular_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771361532220,
+      "tag": "0007_ancient_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

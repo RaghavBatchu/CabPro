@@ -204,7 +204,7 @@ const Dashboard = () => {
     }
 
     try {
-      await rejectRideRequest(requestId, { leaderId: userData._id });
+      await rejectRideRequest(requestId, { leaderId: userData.id });
       toast.info("Participant request rejected");
       // Reload rides to show updated status
       const filters: RideFilters = {};
