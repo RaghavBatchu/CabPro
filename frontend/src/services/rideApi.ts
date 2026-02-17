@@ -26,7 +26,7 @@ export interface Ride {
 
 export interface CreateRidePayload {
   createdBy: string;
-  rideType: "CAR" | "BIKE" | "AUTO" | "BUS";
+  rideType: "CAR" | "BIKE" | "AUTO" | "TEMPO";
   origin: string;
   destination: string;
   rideDate: string;

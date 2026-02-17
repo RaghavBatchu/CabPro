@@ -15,7 +15,7 @@ const rides = pgTable("rides", {
     .references(() => users.id)
     .notNull(),
 
-  // CAR | BIKE | AUTO | BUS
+  // CAR | BIKE | AUTO | TEMPO
   rideType: varchar("ride_type", { length: 20 }).notNull(),
 
   origin: varchar("origin", { length: 255 }).notNull(),

@@ -38,7 +38,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
     destination: initialFilters.destination || "",
     date: initialFilters.date || "",
     time: initialFilters.time || "",
-    rideType: "CAR" as "CAR" | "BIKE" | "AUTO" | "BUS",
+    rideType: "CAR" as "CAR" | "BIKE" | "AUTO" | "TEMPO",
     genderPreference: "ALL" as "ALL" | "MALE" | "FEMALE",
     totalSeats: 4,
     pricingType: "PER_HEAD" as "PER_HEAD" | "SHARED" | "FIXED",
@@ -237,7 +237,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                 <Label htmlFor="rideType">Ride Type *</Label>
                 <Select
                   value={formData.rideType}
-                  onValueChange={(value: "CAR" | "BIKE" | "AUTO" | "BUS") => 
+                  onValueChange={(value: "CAR" | "BIKE" | "AUTO" | "TEMPO") => 
                     setFormData(prev => ({ ...prev, rideType: value }))
                   }
                 >
@@ -248,7 +248,7 @@ export const CreateRideModal: React.FC<CreateRideModalProps> = ({
                     <SelectItem value="CAR">Car</SelectItem>
                     <SelectItem value="BIKE">Bike</SelectItem>
                     <SelectItem value="AUTO">Auto</SelectItem>
-                    <SelectItem value="BUS">Bus</SelectItem>
+                    <SelectItem value="TEMPO">Tempo</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

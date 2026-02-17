@@ -40,6 +40,21 @@ const UserDetails = () => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+
+    // Validation
+    if (!collegeEmail.endsWith(".edu") && !collegeEmail.endsWith(".edu.in") && !collegeEmail.endsWith(".ac.in")) {
+      setError("College email must end with .edu, .edu.in or .ac.in");
+      setSubmitting(false);
+      return;
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(whatsappNumber)) {
+      setError("WhatsApp number must be exactly 10 digits");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/users`, {
         method: "POST",
@@ -52,6 +67,7 @@ const UserDetails = () => {
       }
       navigate("/dashboard");
     } catch (err: any) {
+      // ... existing error handling
       setError(err.message || "Something went wrong");
     } finally {
       setSubmitting(false);
