@@ -35,6 +35,7 @@ const Dashboard = () => {
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
   const [userRequestsMap, setUserRequestsMap] = useState<Record<string, string>>({});
   const [userRequestIdsMap, setUserRequestIdsMap] = useState<Record<string, string>>({});
+  const [userRejectionReasonsMap, setUserRejectionReasonsMap] = useState<Record<string, string>>({});
 
   const loadUserRequests = async () => {
     if (!userData?.id) return;
@@ -42,12 +43,17 @@ const Dashboard = () => {
       const requests = await fetchUserRequests(userData.id);
       const map: Record<string, string> = {};
       const idMap: Record<string, string> = {};
+      const rejectionMap: Record<string, string> = {};
       requests.forEach((req: any) => {
         map[req.rideId] = req.status;
         idMap[req.rideId] = req.id;
+        if (req.rejectionReason) {
+            rejectionMap[req.rideId] = req.rejectionReason;
+        }
       });
       setUserRequestsMap(map);
       setUserRequestIdsMap(idMap);
+      setUserRejectionReasonsMap(rejectionMap);
     } catch (error) {
       console.error("Failed to load user requests:", error);
     }
@@ -409,6 +415,7 @@ const Dashboard = () => {
                 onLeaveRide={handleLeaveRide}
                 onDeleteRide={handleDeleteRide}
                 requestStatus={userRequestsMap[ride.id] as any}
+                rejectionReason={userRejectionReasonsMap[ride.id]}
               />
           ))
         ) : (

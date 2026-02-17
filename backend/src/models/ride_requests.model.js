@@ -1,9 +1,9 @@
 import {
-    pgTable,
-    uuid,
-    varchar,
-    timestamp,
-    uniqueIndex
+  pgTable,
+  uuid,
+  varchar,
+  timestamp,
+  uniqueIndex
 } from "drizzle-orm/pg-core";
 import rides from "./ride.model.js";
 import users from "./user.model.js";
@@ -25,10 +25,11 @@ const rideRequests = pgTable(
       .default("PENDING"), // PENDING | ACCEPTED | REJECTED | CANCELLED
 
     completionStatus: varchar("completion_status", { length: 30 })
-      .default("PENDING"), 
-      // PENDING | COMPLETED | COMPLETED_SAFELY | ISSUE_REPORTED
+      .default("PENDING"),
+    // PENDING | COMPLETED | COMPLETED_SAFELY | ISSUE_REPORTED
 
     issueDescription: varchar("issue_description", { length: 500 }),
+    rejectionReason: varchar("rejection_reason", { length: 500 }),
 
     requestedAt: timestamp("requested_at").defaultNow(),
     respondedAt: timestamp("responded_at"),

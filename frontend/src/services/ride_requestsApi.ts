@@ -8,6 +8,7 @@ export interface SendJoinRequestPayload {
 
 export interface AcceptRejectPayload {
     leaderId: string;
+    rejectionReason?: string;
 }
 
 export interface CompletionFeedbackPayload {

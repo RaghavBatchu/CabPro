@@ -27,6 +27,7 @@ interface RideCardProps {
   onLeaveRide: (rideId: string) => void;
   onDeleteRide?: (rideId: string) => void;
   requestStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | null;
+  rejectionReason?: string;
 }
 
 export const RideCard = ({
@@ -36,6 +37,7 @@ export const RideCard = ({
   onLeaveRide,
   onDeleteRide,
   requestStatus,
+  rejectionReason,
 }: RideCardProps) => {
   const isDriver = ride.createdBy === currentUserId;
   const isParticipant = requestStatus === "ACCEPTED";
@@ -90,8 +92,11 @@ export const RideCard = ({
   };
 
   const handleReject = async (requestId: string) => {
+    const reason = window.prompt("Please provide a reason for rejecting this request:");
+    if (reason === null) return; // User cancelled
+
     try {
-      await rejectRideRequest(requestId, { leaderId: currentUserId });
+      await rejectRideRequest(requestId, { leaderId: currentUserId, rejectionReason: reason });
       toast.success("Request rejected");
       // refresh participants
       const rideDetails = await fetchRideById(ride.id);
@@ -137,6 +142,11 @@ export const RideCard = ({
               {requestStatus === "PENDING" && (
                 <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
                   Requested
+                </Badge>
+              )}
+              {requestStatus === "REJECTED" && (
+                <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
+                  Rejected
                 </Badge>
               )}
               {isParticipant && (
@@ -337,6 +347,13 @@ export const RideCard = ({
                  >
                    Requested
                  </Button>
+               ) : requestStatus === "REJECTED" ? (
+                 <div className="flex-1 flex flex-col items-center justify-center p-2 bg-red-50 rounded border border-red-100">
+                   <span className="text-xs font-semibold text-red-700">Request Rejected</span>
+                   {rejectionReason && (
+                     <span className="text-xs text-red-600 italic mt-0.5 text-center">"{rejectionReason}"</span>
+                   )}
+                 </div>
               ) : (
                 <Button
                   className="btn-primary flex-1 transition-all duration-200"

@@ -132,7 +132,7 @@ export const acceptRequest = async (req, res) => {
 // REJECT REQUEST (Leader Only)
 export const rejectRequest = async (req, res) => {
   const { id } = req.params;
-  const { leaderId } = req.body;
+  const { leaderId, rejectionReason } = req.body;
 
   try {
 
@@ -162,6 +162,7 @@ export const rejectRequest = async (req, res) => {
         .set({
           status: "REJECTED",
           respondedAt: new Date(),
+          rejectionReason: rejectionReason || null
         })
         .where(eq(rideRequests.id, id));
     });
