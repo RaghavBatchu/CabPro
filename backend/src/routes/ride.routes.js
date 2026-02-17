@@ -1,33 +1,42 @@
-import express from "express";
+import { Router } from "express";
 import {
-  getRides,
   createRide,
+  getRides,
   getRideById,
-  joinRide,
-  leaveRide,
-  deleteRide,
-  getRideSuggestions,
+  startRide,
+  completeRide,
+  cancelRide
 } from "../controllers/ride.controller.js";
 
-const router = express.Router();
+const rideRouter = Router();
 
-router.route("/")
-  .get(getRides)
-  .post(createRide);
+/*READ ROUTES*/
 
-// parameterized routes will be defined after the specific routes
+// GET all rides (with filters)
+// GET /api/rides
+rideRouter.get("/", getRides);
 
-// Place specific routes before parameterized routes to avoid route collisions
-router.route("/suggestions").get(getRideSuggestions);
+// GET ride by ID
+// GET /api/rides/:id
+rideRouter.get("/:id", getRideById);
 
-router.route("/:id")
-  .get(getRideById)
-  .delete(deleteRide);
 
-router.route("/:id/join")
-  .post(joinRide);
+/*WRITE ROUTES*/
 
-router.route("/:id/leave")
-  .post(leaveRide);
+// Create ride
+// POST /api/rides
+rideRouter.post("/", createRide);
 
-export default router;
+// Start ride (Leader only)
+// POST /api/rides/:id/start
+rideRouter.post("/:id/start", startRide);
+
+// Complete ride (Leader only)
+// POST /api/rides/:id/complete
+rideRouter.post("/:id/complete", completeRide);
+
+// Cancel ride (Leader only)
+// DELETE /api/rides/:id
+rideRouter.delete("/:id", cancelRide);
+
+export default rideRouter;
