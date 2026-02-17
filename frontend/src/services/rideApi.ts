@@ -22,6 +22,10 @@ export interface Ride {
   status: "OPEN" | "FULL" | "STARTED" | "COMPLETED" | "CANCELLED";
   createdAt: string;
   updatedAt: string;
+  leaderName?: string;
+  leaderRating?: string | number;
+  leaderTotalReviews?: number;
+  leaderPhone?: string;
 }
 
 export interface CreateRidePayload {

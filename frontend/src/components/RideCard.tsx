@@ -43,6 +43,7 @@ export const RideCard = ({
   const isFull = (availableSeats ?? 0) === 0;
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
+  const [leaderPhone, setLeaderPhone] = useState<string | null>(null);
 
   useEffect(() => {
     setAvailableSeats(ride.availableSeats ?? 0);
@@ -57,6 +58,9 @@ export const RideCard = ({
           const rideDetails = await fetchRideById(ride.id);
           if (rideDetails.participants) {
             setParticipants(rideDetails.participants);
+          }
+          if (rideDetails.leaderPhone) {
+            setLeaderPhone(rideDetails.leaderPhone);
           }
         } catch (error) {
           console.error("Failed to load participants:", error);
@@ -139,6 +143,21 @@ export const RideCard = ({
                 <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
                   Joined
                 </Badge>
+              )}
+            </div>
+            {/* Leader Info */}
+            <div className="flex flex-col gap-1 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-primary">{ride.leaderName}</span>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                  <span>{Number(ride.leaderRating || 0).toFixed(1)} <span className="text-[10px] opacity-70">({ride.leaderTotalReviews || 0})</span></span>
+                </div>
+              </div>
+              {isParticipant && leaderPhone && (
+                <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
+                   <span>📞 {leaderPhone}</span>
+                </div>
               )}
             </div>
             <div className="flex flex-col gap-2 text-sm text-muted-foreground">
@@ -303,7 +322,11 @@ export const RideCard = ({
                 <Button
                   variant="outline"
                   className="flex-1 hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))] transition-all duration-200"
-                  onClick={() => onLeaveRide(ride.id)}
+                  onClick={() => {
+                    if (window.confirm("Warning: Leaving a confirmed ride may affect your rating. Are you sure you want to proceed?")) {
+                      onLeaveRide(ride.id);
+                    }
+                  }}
                 >
                   Leave Ride
                 </Button>

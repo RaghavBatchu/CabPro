@@ -34,16 +34,20 @@ const Dashboard = () => {
   const [originOptions, setOriginOptions] = useState<string[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
   const [userRequestsMap, setUserRequestsMap] = useState<Record<string, string>>({});
+  const [userRequestIdsMap, setUserRequestIdsMap] = useState<Record<string, string>>({});
 
   const loadUserRequests = async () => {
     if (!userData?.id) return;
     try {
       const requests = await fetchUserRequests(userData.id);
       const map: Record<string, string> = {};
+      const idMap: Record<string, string> = {};
       requests.forEach((req: any) => {
         map[req.rideId] = req.status;
+        idMap[req.rideId] = req.id;
       });
       setUserRequestsMap(map);
+      setUserRequestIdsMap(idMap);
     } catch (error) {
       console.error("Failed to load user requests:", error);
     }
@@ -152,15 +156,24 @@ const Dashboard = () => {
     }
   };
 
-  const handleLeaveRide = async (requestId: string) => {
+  const handleLeaveRide = async (rideId: string) => {
     if (!userData) {
       toast.error("User data not available");
+      return;
+    }
+    
+    const requestId = userRequestIdsMap[rideId];
+    if (!requestId) {
+      toast.error("Request not found for this ride");
       return;
     }
 
     try {
       await cancelRideRequest(requestId);
-      toast.info("Request cancelled successfully");
+      toast.warning("You have left the ride. Frequent cancellations are discouraged.");
+      // Reload user requests to update status maps
+      await loadUserRequests();
+      
       // Reload rides to show updated status
       const filters: RideFilters = {};
       if (originFilter !== "all") filters.origin = originFilter;

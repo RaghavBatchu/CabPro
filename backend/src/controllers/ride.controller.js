@@ -104,8 +104,14 @@ export const getRides = async (req, res) => {
     conditions.push(inArray(rides.status, ["OPEN", "FULL"]));
 
     const result = await db
-      .select()
+      .select({
+        ...rides,
+        leaderName: users.fullName,
+        leaderRating: users.averageRating,
+        leaderTotalReviews: users.totalReviews
+      })
       .from(rides)
+      .innerJoin(users, eq(rides.createdBy, users.id))
       .where(and(...conditions))
       .orderBy(rides.rideDate, rides.timeMinutes);
 
@@ -122,8 +128,15 @@ export const getRideById = async (req, res) => {
     const { id } = req.params;
 
     const ride = await db
-      .select()
+      .select({
+        ...rides,
+        leaderName: users.fullName,
+        leaderPhone: users.whatsappNumber,
+        leaderRating: users.averageRating,
+        leaderTotalReviews: users.totalReviews
+      })
       .from(rides)
+      .innerJoin(users, eq(rides.createdBy, users.id))
       .where(eq(rides.id, id));
 
     if (!ride.length) {
