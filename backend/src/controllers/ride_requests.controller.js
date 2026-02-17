@@ -255,3 +255,20 @@ export const submitCompletionFeedback = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// GET USER REQUESTS
+export const getUserRequests = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const requests = await db
+      .select()
+      .from(rideRequests)
+      .where(eq(rideRequests.userId, userId));
+
+    res.status(200).json(requests);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

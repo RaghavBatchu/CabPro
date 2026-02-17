@@ -15,7 +15,7 @@ import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
 import { fetchRides, Ride, RideFilters } from "@/services/rideApi";
 import { cancelRide } from "@/services/rideApi";
-import { sendJoinRequest, rejectRideRequest, cancelRideRequest } from "@/services/ride_requestsApi";
+import { sendJoinRequest, rejectRideRequest, cancelRideRequest, fetchUserRequests } from "@/services/ride_requestsApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
 
@@ -33,6 +33,25 @@ const Dashboard = () => {
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
   const [originOptions, setOriginOptions] = useState<string[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
+  const [userRequestsMap, setUserRequestsMap] = useState<Record<string, string>>({});
+
+  const loadUserRequests = async () => {
+    if (!userData?.id) return;
+    try {
+      const requests = await fetchUserRequests(userData.id);
+      const map: Record<string, string> = {};
+      requests.forEach((req: any) => {
+        map[req.rideId] = req.status;
+      });
+      setUserRequestsMap(map);
+    } catch (error) {
+      console.error("Failed to load user requests:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadUserRequests();
+  }, [userData]);
 
   const origins = originOptions.length > 0 ? originOptions : Array.from(new Set(rides.map((r) => r.origin)));
   const destinations = destinationOptions.length > 0 ? destinationOptions : Array.from(new Set(rides.map((r) => r.destination)));
@@ -112,8 +131,10 @@ const Dashboard = () => {
     }
 
     try {
-      await sendJoinRequest({ rideId, userId: userData._id });
+      await sendJoinRequest({ rideId, userId: userData.id });
       toast.success("Join request sent successfully! Waiting for leader approval.");
+      // Reload requests to update UI
+      loadUserRequests();
       // Optionally reload rides to show updated request status
       const filters: RideFilters = {};
       if (originFilter !== "all") filters.origin = originFilter;
@@ -374,6 +395,7 @@ const Dashboard = () => {
                 onJoinRide={handleJoinRide}
                 onLeaveRide={handleLeaveRide}
                 onDeleteRide={handleDeleteRide}
+                requestStatus={userRequestsMap[ride.id] as any}
               />
           ))
         ) : (

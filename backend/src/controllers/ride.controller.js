@@ -1,6 +1,7 @@
 import { db } from "../../Database/database.js"
 import rides from "../models/ride.model.js";
 import rideRequests from "../models/ride_requests.model.js";
+import users from "../models/user.model.js";
 
 import { eq, and, inArray, sql } from "drizzle-orm";
 
@@ -130,8 +131,16 @@ export const getRideById = async (req, res) => {
     }
 
     const participants = await db
-      .select()
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        personalEmail: users.personalEmail,
+        whatsappNumber: users.whatsappNumber,
+        gender: users.gender,
+        status: rideRequests.status
+      })
       .from(rideRequests)
+      .innerJoin(users, eq(rideRequests.userId, users.id))
       .where(
         and(
           eq(rideRequests.rideId, id),

@@ -67,7 +67,7 @@ export const fetchRides = async (
 // GET /api/rides/:id
 export const fetchRideById = async (
   id: string
-): Promise<Ride> => {
+): Promise<any> => {
   const res = await api.get(`/rides/${id}`);
   return res.data;
 };
@@ -119,3 +119,4 @@ export const cancelRide = async (
 
   return res.data;
 };
+

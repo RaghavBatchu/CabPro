@@ -2,8 +2,17 @@ import { Users, Clock, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Ride } from "@/services/rideApi";
+import { Ride, fetchRideById } from "@/services/rideApi";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+
+interface Participant {
+  id: string;
+  fullName: string;
+  personalEmail: string;
+  whatsappNumber: string;
+  gender: string;
+}
 
 interface RideCardProps {
   ride: Ride;
@@ -11,6 +20,7 @@ interface RideCardProps {
   onJoinRide: (rideId: string) => void;
   onLeaveRide: (rideId: string) => void;
   onDeleteRide?: (rideId: string) => void;
+  requestStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | null;
 }
 
 export const RideCard = ({
@@ -19,11 +29,33 @@ export const RideCard = ({
   onJoinRide,
   onLeaveRide,
   onDeleteRide,
+  requestStatus,
 }: RideCardProps) => {
   const isDriver = ride.createdBy === currentUserId;
-  // Note: Participant checking requires ride requests API
-  const isParticipant = false; // Simplified for now
+  const isParticipant = requestStatus === "ACCEPTED";
   const isFull = (ride.availableSeats ?? 0) === 0;
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [loadingParticipants, setLoadingParticipants] = useState(false);
+
+  useEffect(() => {
+    // Only fetch participants if user is driver or accepted participant
+    if (isDriver || isParticipant) {
+      const loadParticipants = async () => {
+        try {
+          setLoadingParticipants(true);
+          const rideDetails = await fetchRideById(ride.id);
+          if (rideDetails.participants) {
+            setParticipants(rideDetails.participants);
+          }
+        } catch (error) {
+          console.error("Failed to load participants:", error);
+        } finally {
+          setLoadingParticipants(false);
+        }
+      };
+      loadParticipants();
+    }
+  }, [ride.id, isDriver, isParticipant]);
 
   const getGenderBadgeColor = (gender: string) => {
     switch (gender) {
@@ -48,6 +80,16 @@ export const RideCard = ({
               {isDriver && (
                 <Badge className="bg-primary text-primary-foreground">
                   Ride Leader
+                </Badge>
+              )}
+              {requestStatus === "PENDING" && (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
+                  Requested
+                </Badge>
+              )}
+              {isParticipant && (
+                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                  Joined
                 </Badge>
               )}
             </div>
@@ -94,7 +136,36 @@ export const RideCard = ({
 
         {/* Contact information would come from user data, not ride data */}
 
-        {/* Participant list would require fetching ride requests data */}
+        {/* Participants List */}
+        {(isDriver || isParticipant) && (
+          <div className="border-t border-border/50 pt-4 mb-4">
+             <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+               <Users className="w-4 h-4 text-primary" />
+               Confirmed Participants ({participants.length})
+             </h4>
+             {loadingParticipants ? (
+               <div className="text-xs text-muted-foreground animate-pulse">Loading participants...</div>
+             ) : participants.length > 0 ? (
+               <div className="grid grid-cols-1 gap-2">
+                 {participants.map((p) => (
+                   <div key={p.id} className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded border border-border/50">
+                     <div className="flex items-center gap-2">
+                       <span className="font-medium">{p.fullName}</span>
+                       <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+                         {p.gender}
+                       </Badge>
+                     </div>
+                     {isDriver && (
+                       <span className="text-xs text-muted-foreground">{p.whatsappNumber}</span>
+                     )}
+                   </div>
+                 ))}
+               </div>
+             ) : (
+               <p className="text-xs text-muted-foreground italic">No participants yet</p>
+             )}
+          </div>
+        )}
 
         <div className="flex gap-2">
           {isDriver ? (
@@ -128,6 +199,13 @@ export const RideCard = ({
                 >
                   Leave Ride
                 </Button>
+              ) : requestStatus === "PENDING" ? (
+                 <Button
+                  disabled
+                  className="flex-1 bg-yellow-100 text-yellow-800 border-yellow-200 opacity-80"
+                 >
+                   Requested
+                 </Button>
               ) : (
                 <Button
                   className="btn-primary flex-1 transition-all duration-200"
