@@ -1,10 +1,11 @@
 import { Router } from "express";
 import {
-  sendJoinRequest,
-  acceptRequest,
-  rejectRequest,
-  cancelRequest,
-  submitCompletionFeedback
+    sendJoinRequest,
+    acceptRequest,
+    rejectRequest,
+    cancelRequest,
+    submitCompletionFeedback,
+    getUserRequests
 } from "../controllers/ride_requests.controller.js";
 
 const rideRequestRouter = Router();
@@ -14,6 +15,10 @@ const rideRequestRouter = Router();
 // Send join request
 // POST /api/ride-requests
 rideRequestRouter.post("/", sendJoinRequest);
+
+// Get user requests
+// GET /api/ride-requests/user/:userId
+rideRequestRouter.get("/user/:userId", getUserRequests);
 
 // Accept request (Leader only)
 // POST /api/ride-requests/:id/accept

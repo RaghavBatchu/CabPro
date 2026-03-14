@@ -87,14 +87,9 @@ const LandingPage = () => {
     try {
       // Use the lightweight exists check endpoint to decide where to go
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-      const res = await fetch(`${apiBase}/api/users/exists/check?personalEmail=${encodeURIComponent(email)}`, { credentials: 'include' });
+      const res = await fetch(`${apiBase}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`, { credentials: 'include' });
       if (res.ok) {
-        const data = await res.json();
-        if (data?.exists) {
-          navigate('/dashboard');
-        } else {
-          navigate('/user-details');
-        }
+        navigate('/dashboard');
       } else {
         navigate('/user-details');
       }

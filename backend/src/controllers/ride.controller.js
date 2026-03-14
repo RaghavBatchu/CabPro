@@ -1,8 +1,9 @@
 import { db } from "../../Database/database.js"
 import rides from "../models/ride.model.js";
 import rideRequests from "../models/ride_requests.model.js";
+import users from "../models/user.model.js";
 
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, lt, or } from "drizzle-orm";
 
 // POST /api/rides
 export const createRide = async (req, res) => {
@@ -19,6 +20,8 @@ export const createRide = async (req, res) => {
       pricePerHead,
       basePrice,
       pricePerKm,
+      estimatedDistanceKm,
+      estimatedDurationMin,
       genderPreference
     } = req.body;
 
@@ -43,6 +46,8 @@ export const createRide = async (req, res) => {
       pricePerHead,
       basePrice,
       pricePerKm,
+      estimatedDistanceKm,
+      estimatedDurationMin,
       genderPreference: genderPreference || "ALL",
       status: "OPEN"
     }).returning();
@@ -57,6 +62,24 @@ export const createRide = async (req, res) => {
 // GET /api/rides
 export const getRides = async (req, res) => {
   try {
+    // Auto-mark past rides as COMPLETED
+    const now = new Date();
+    // Use UTC date to match how dates are typically stored from frontend
+    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    await db.update(rides)
+      .set({ status: "COMPLETED" })
+      .where(
+        and(
+          inArray(rides.status, ["OPEN", "FULL"]),
+          or(
+            lt(rides.rideDate, today),
+            and(eq(rides.rideDate, today), lt(rides.timeMinutes, nowMinutes))
+          )
+        )
+      );
+
     const {
       origin,
       destination,
@@ -99,8 +122,14 @@ export const getRides = async (req, res) => {
     conditions.push(inArray(rides.status, ["OPEN", "FULL"]));
 
     const result = await db
-      .select()
+      .select({
+        ...rides,
+        leaderName: users.fullName,
+        leaderRating: users.averageRating,
+        leaderTotalReviews: users.totalReviews
+      })
       .from(rides)
+      .innerJoin(users, eq(rides.createdBy, users.id))
       .where(and(...conditions))
       .orderBy(rides.rideDate, rides.timeMinutes);
 
@@ -117,8 +146,15 @@ export const getRideById = async (req, res) => {
     const { id } = req.params;
 
     const ride = await db
-      .select()
+      .select({
+        ...rides,
+        leaderName: users.fullName,
+        leaderPhone: users.whatsappNumber,
+        leaderRating: users.averageRating,
+        leaderTotalReviews: users.totalReviews
+      })
       .from(rides)
+      .innerJoin(users, eq(rides.createdBy, users.id))
       .where(eq(rides.id, id));
 
     if (!ride.length) {
@@ -126,14 +162,20 @@ export const getRideById = async (req, res) => {
     }
 
     const participants = await db
-      .select()
+      .select({
+        id: users.id,
+        fullName: users.fullName,
+        personalEmail: users.personalEmail,
+        whatsappNumber: users.whatsappNumber,
+        gender: users.gender,
+        averageRating: users.averageRating,
+        totalReviews: users.totalReviews,
+        status: rideRequests.status,
+        requestId: rideRequests.id
+      })
       .from(rideRequests)
-      .where(
-        and(
-          eq(rideRequests.rideId, id),
-          eq(rideRequests.status, "ACCEPTED")
-        )
-      );
+      .innerJoin(users, eq(rideRequests.userId, users.id))
+      .where(eq(rideRequests.rideId, id));
 
     res.status(200).json({
       ...ride[0],
@@ -208,7 +250,7 @@ export const completeRide = async (req, res) => {
 // DELETE /api/rides/:id
 export const cancelRide = async (req, res) => {
   const { id } = req.params;
-  const { leaderId } = req.body;
+  const { leaderId, reason } = req.body;
 
   try {
     const ride = await db
@@ -222,8 +264,15 @@ export const cancelRide = async (req, res) => {
       return res.status(403).json({ message: "Only leader can cancel ride" });
     }
 
+    if (ride[0].status === "CANCELLED" || ride[0].status === "COMPLETED") {
+      return res.status(400).json({ message: "Ride is already finalized" });
+    }
+
     await db.update(rides)
-      .set({ status: "CANCELLED" })
+      .set({
+        status: "CANCELLED",
+        cancellationReason: reason
+      })
       .where(eq(rides.id, id));
 
     res.status(200).json({ message: "Ride cancelled" });

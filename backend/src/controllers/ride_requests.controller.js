@@ -1,6 +1,7 @@
 import { db } from "../../Database/database.js";
 import rideRequests from "../models/ride_requests.model.js";
 import rides from "../models/ride.model.js";
+import users from "../models/user.model.js";
 
 import { eq, and } from "drizzle-orm";
 
@@ -131,7 +132,7 @@ export const acceptRequest = async (req, res) => {
 // REJECT REQUEST (Leader Only)
 export const rejectRequest = async (req, res) => {
   const { id } = req.params;
-  const { leaderId } = req.body;
+  const { leaderId, rejectionReason } = req.body;
 
   try {
 
@@ -161,6 +162,7 @@ export const rejectRequest = async (req, res) => {
         .set({
           status: "REJECTED",
           respondedAt: new Date(),
+          rejectionReason: rejectionReason || null
         })
         .where(eq(rideRequests.id, id));
     });
@@ -250,6 +252,23 @@ export const submitCompletionFeedback = async (req, res) => {
       .where(eq(rideRequests.id, id));
 
     res.status(200).json({ message: "Feedback submitted" });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// GET USER REQUESTS
+export const getUserRequests = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const requests = await db
+      .select()
+      .from(rideRequests)
+      .where(eq(rideRequests.userId, userId));
+
+    res.status(200).json(requests);
 
   } catch (error) {
     res.status(500).json({ message: error.message });

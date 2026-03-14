@@ -1,61 +1,73 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001";
+import api from "../api/axiosInstance";
 
 export interface UserDto {
-  _id: string;
+  id: string;
   fullName: string;
   personalEmail: string;
   collegeEmail: string;
   whatsappNumber: string;
   gender: "Male" | "Female" | "Other";
+  averageRating?: number;
+  totalReviews?: number;
 }
 
-export async function fetchUserByEmail(personalEmail: string): Promise<UserDto> {
-  const url = `${API_BASE}/api/users/by-email/find?personalEmail=${encodeURIComponent(personalEmail)}`;
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const err: any = new Error(`Failed to fetch user: ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
 
-export async function updateUser(id: string, updates: Partial<UserDto>): Promise<UserDto> {
-  const url = `${API_BASE}/api/users/${id}`;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updates),
-    credentials: "include",
+// GET all users
+export const fetchUsers = async (): Promise<UserDto[]> => {
+  const res = await api.get("/users");
+  return res.data;
+};
+
+
+// GET user by ID
+export const fetchUserById = async (id: string): Promise<UserDto> => {
+  const res = await api.get(`/users/${id}`);
+  return res.data;
+};
+
+
+// GET user by email
+export const fetchUserByEmail = async (personalEmail: string): Promise<UserDto> => {
+  const res = await api.get("/users/by-email", {
+    params: { personalEmail },
   });
-  if (!res.ok) {
-    const err: any = new Error(`Failed to update user: ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
+  return res.data;
+};
 
-export async function createUser(payload: {
+
+// Check user exists
+export const checkUserExists = async (personalEmail: string): Promise<boolean> => {
+  const res = await api.get("/users/exists", {
+    params: { personalEmail },
+  });
+  return res.data.exists;
+};
+
+
+// CREATE user
+export const createUser = async (payload: {
   fullName: string;
   personalEmail: string;
   collegeEmail: string;
   whatsappNumber: string;
   gender: "Male" | "Female" | "Other";
-}): Promise<UserDto> {
-  const url = `${API_BASE}/api/users`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    credentials: "include",
-  });
-  if (!res.ok) {
-    const err: any = new Error(`Failed to create user: ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
+}): Promise<UserDto> => {
+  const res = await api.post("/users", payload);
+  return res.data;
+};
 
 
+// UPDATE user
+export const updateUser = async (
+  id: string,
+  updates: Partial<UserDto>
+): Promise<UserDto> => {
+  const res = await api.put(`/users/${id}`, updates);
+  return res.data;
+};
+
+
+// DELETE user
+export const deleteUser = async (id: string): Promise<void> => {
+  await api.delete(`/users/${id}`);
+};

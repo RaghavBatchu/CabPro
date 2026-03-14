@@ -15,7 +15,7 @@ const rides = pgTable("rides", {
     .references(() => users.id)
     .notNull(),
 
-  // CAR | BIKE | AUTO | BUS
+  // CAR | BIKE | AUTO | TEMPO
   rideType: varchar("ride_type", { length: 20 }).notNull(),
 
   origin: varchar("origin", { length: 255 }).notNull(),
@@ -44,6 +44,8 @@ const rides = pgTable("rides", {
 
   status: varchar("status", { length: 20 })
     .default("OPEN"),
+
+  cancellationReason: varchar("cancellation_reason", { length: 255 }),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at")

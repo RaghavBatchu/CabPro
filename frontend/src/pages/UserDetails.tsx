@@ -17,15 +17,21 @@ const UserDetails = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If user already exists, skip this page
+    // If user already exists, redirect to dashboard
     const email = user?.primaryEmailAddress?.emailAddress;
     if (!email) return;
+    
     const checkExisting = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/users/exists/check?personalEmail=${encodeURIComponent(email)}`);
-        const data = await res.json();
-        if (data?.exists) navigate("/dashboard", { replace: true });
-      } catch {}
+        const res = await fetch(`${API_BASE}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          // User exists, redirect to dashboard
+          navigate("/dashboard", { replace: true });
+        }
+      } catch (error) {
+        // User doesn't exist or error occurred, stay on this page to allow registration
+        console.log("User not found, showing registration form");
+      }
     };
     checkExisting();
   }, [user, navigate]);
@@ -34,6 +40,21 @@ const UserDetails = () => {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+
+    // Validation
+    if (!collegeEmail.endsWith(".edu") && !collegeEmail.endsWith(".edu.in") && !collegeEmail.endsWith(".ac.in")) {
+      setError("College email must end with .edu, .edu.in or .ac.in");
+      setSubmitting(false);
+      return;
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!phoneRegex.test(whatsappNumber)) {
+      setError("WhatsApp number must be exactly 10 digits");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_BASE}/api/users`, {
         method: "POST",
@@ -46,6 +67,7 @@ const UserDetails = () => {
       }
       navigate("/dashboard");
     } catch (err: any) {
+      // ... existing error handling
       setError(err.message || "Something went wrong");
     } finally {
       setSubmitting(false);
