@@ -2,6 +2,7 @@ import { db } from "../../Database/database.js";
 import rideRequests from "../models/ride_requests.model.js";
 import rides from "../models/ride.model.js";
 import users from "../models/user.model.js";
+import { sendJoinRequestEmail } from "../utils/emailService.js";
 
 import { eq, and } from "drizzle-orm";
 
@@ -14,10 +15,7 @@ export const sendJoinRequest = async (req, res) => {
       return res.status(400).json({ message: "rideId and userId required" });
     }
 
-    const ride = await db
-      .select()
-      .from(rides)
-      .where(eq(rides.id, rideId));
+    const ride = await db.select().from(rides).where(eq(rides.id, rideId));
 
     if (!ride.length) {
       return res.status(404).json({ message: "Ride not found" });
@@ -31,13 +29,47 @@ export const sendJoinRequest = async (req, res) => {
       return res.status(400).json({ message: "Ride not open for requests" });
     }
 
+    // Get participant details for email
+    const participant = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!participant.length) {
+      return res.status(404).json({ message: "Participant not found" });
+    }
+
+    // Get ride leader details for email
+    const leader = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, ride[0].createdBy));
+
+    if (!leader.length) {
+      return res.status(404).json({ message: "Ride leader not found" });
+    }
+
     await db.insert(rideRequests).values({
       rideId,
       userId,
     });
 
-    res.status(201).json({ message: "Join request sent successfully" });
+    // Send email notification to ride leader
+    try {
+      await sendJoinRequestEmail(
+        leader[0].personalEmail,
+        leader[0].fullName,
+        participant[0].fullName,
+        participant[0].averageRating || 0,
+        participant[0].totalReviews || 0,
+        ride[0],
+      );
+    } catch (emailError) {
+      console.error("Failed to send email notification:", emailError);
+      // Don't fail the request if email fails, just log it
+    }
 
+    res.status(201).json({ message: "Join request sent successfully" });
   } catch (error) {
     if (error.message.includes("unique_request_per_ride")) {
       return res.status(400).json({ message: "Request already exists" });
@@ -47,16 +79,13 @@ export const sendJoinRequest = async (req, res) => {
   }
 };
 
-
 // ACCEPT REQUEST (Leader Only + Seat Decrement)
 export const acceptRequest = async (req, res) => {
   const { id } = req.params;
   const { leaderId } = req.body; // send leaderId from frontend
 
   try {
-
     await db.transaction(async (tx) => {
-
       const request = await tx
         .select()
         .from(rideRequests)
@@ -122,12 +151,10 @@ export const acceptRequest = async (req, res) => {
     });
 
     res.status(200).json({ message: "Request accepted" });
-
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
-
 
 // REJECT REQUEST (Leader Only)
 export const rejectRequest = async (req, res) => {
@@ -135,9 +162,7 @@ export const rejectRequest = async (req, res) => {
   const { leaderId, rejectionReason } = req.body;
 
   try {
-
     await db.transaction(async (tx) => {
-
       const request = await tx
         .select()
         .from(rideRequests)
@@ -162,18 +187,16 @@ export const rejectRequest = async (req, res) => {
         .set({
           status: "REJECTED",
           respondedAt: new Date(),
-          rejectionReason: rejectionReason || null
+          rejectionReason: rejectionReason || null,
         })
         .where(eq(rideRequests.id, id));
     });
 
     res.status(200).json({ message: "Request rejected" });
-
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
-
 
 // CANCEL REQUEST (User Cancels)
 // If ACCEPTED → Seat Re-Increment
@@ -181,9 +204,7 @@ export const cancelRequest = async (req, res) => {
   const { id } = req.params;
 
   try {
-
     await db.transaction(async (tx) => {
-
       const request = await tx
         .select()
         .from(rideRequests)
@@ -200,7 +221,6 @@ export const cancelRequest = async (req, res) => {
 
       // If request was ACCEPTED → increase seat
       if (request[0].status === "ACCEPTED") {
-
         const newSeats = ride[0].availableSeats + 1;
 
         await tx
@@ -222,12 +242,10 @@ export const cancelRequest = async (req, res) => {
     });
 
     res.status(200).json({ message: "Request cancelled" });
-
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
-
 
 // SUBMIT COMPLETION FEEDBACK
 export const submitCompletionFeedback = async (req, res) => {
@@ -235,7 +253,6 @@ export const submitCompletionFeedback = async (req, res) => {
   const { completionStatus, issueDescription } = req.body;
 
   try {
-
     if (!completionStatus) {
       return res.status(400).json({ message: "completionStatus required" });
     }
@@ -252,7 +269,6 @@ export const submitCompletionFeedback = async (req, res) => {
       .where(eq(rideRequests.id, id));
 
     res.status(200).json({ message: "Feedback submitted" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -269,7 +285,6 @@ export const getUserRequests = async (req, res) => {
       .where(eq(rideRequests.userId, userId));
 
     res.status(200).json(requests);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
