@@ -1,0 +1,46 @@
+services:
+  # ─── Backend (Node.js / Express) ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cabpro-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.production   # create this from .env.development.local
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+    ports:
+      - "5001:5001"
+    networks:
+      - cabpro-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ─── Frontend (React / Vite → Nginx) ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # These are baked into the JS bundle at build time
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:5001}
+    container_name: cabpro-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - cabpro-network
+
+networks:
+  cabpro-network:
+    driver: bridge
