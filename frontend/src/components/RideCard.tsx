@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface Participant {
   id: string; // user id
@@ -44,6 +45,7 @@ export const RideCard = ({
 }: RideCardProps) => {
   const isDriver = ride.createdBy === currentUserId;
   const isParticipant = requestStatus === "ACCEPTED";
+  const { joinRide, leaveRide } = useWebSocket();
   const [availableSeats, setAvailableSeats] = useState(
     ride.availableSeats ?? 0,
   );
@@ -55,6 +57,22 @@ export const RideCard = ({
   useEffect(() => {
     setAvailableSeats(ride.availableSeats ?? 0);
   }, [ride.availableSeats]);
+
+  // Join ride room when user is driver or participant to receive real-time updates
+  useEffect(() => {
+    if (isDriver || isParticipant) {
+      joinRide(ride.id);
+      console.log(`Joined ride room: ${ride.id}`);
+    }
+
+    // Leave room when component unmounts or user is no longer driver/participant
+    return () => {
+      if (isDriver || isParticipant) {
+        leaveRide(ride.id);
+        console.log(`Left ride room: ${ride.id}`);
+      }
+    };
+  }, [isDriver, isParticipant, ride.id, joinRide, leaveRide]);
 
   useEffect(() => {
     // Only fetch participants if user is driver or accepted participant

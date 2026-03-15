@@ -23,6 +23,11 @@ import {
 } from "@/services/ride_requestsApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
+import {
+  useWebSocket,
+  useRideEvents,
+  useRequestEvents,
+} from "@/hooks/useWebSocket";
 
 const Dashboard = () => {
   const { user } = useUser();
@@ -47,6 +52,9 @@ const Dashboard = () => {
   const [userRejectionReasonsMap, setUserRejectionReasonsMap] = useState<
     Record<string, string>
   >({});
+
+  // WebSocket connection
+  const { isConnected } = useWebSocket({ userId: userData?.id });
 
   const loadUserRequests = async () => {
     if (!userData?.id) return;
@@ -90,6 +98,86 @@ const Dashboard = () => {
     const day = d.getDate().toString().padStart(2, "0");
     return `${y}-${m}-${day}`;
   })();
+
+  // WebSocket event handlers for real-time updates
+  useRideEvents((event) => {
+    console.log("Ride event received:", event);
+
+    switch (event.type) {
+      case "ride_created":
+        if (event.ride) {
+          setRides((prev) => [...prev, event.ride]);
+          toast.success("New ride created!");
+        }
+        break;
+
+      case "ride_updated":
+        if (event.rideId && event.updatedData) {
+          setRides((prev) =>
+            prev.map((ride) =>
+              ride.id === event.rideId
+                ? { ...ride, ...event.updatedData }
+                : ride,
+            ),
+          );
+        }
+        break;
+
+      case "ride_cancelled":
+        if (event.rideId) {
+          setRides((prev) => prev.filter((ride) => ride.id !== event.rideId));
+          toast.error("Ride cancelled");
+        }
+        break;
+
+      case "ride_started":
+        if (event.rideId) {
+          setRides((prev) =>
+            prev.map((ride) =>
+              ride.id === event.rideId ? { ...ride, status: "STARTED" } : ride,
+            ),
+          );
+          toast.info("Ride started!");
+        }
+        break;
+
+      case "ride_completed":
+        if (event.rideId) {
+          setRides((prev) => prev.filter((ride) => ride.id !== event.rideId));
+          toast.success("Ride completed!");
+        }
+        break;
+    }
+  });
+
+  useRequestEvents((event) => {
+    console.log("Request event received:", event);
+
+    switch (event.type) {
+      case "request_accepted":
+        if (event.request?.userId === userData?.id) {
+          toast.success("Your join request was accepted!");
+          loadUserRequests();
+        }
+        break;
+
+      case "request_rejected":
+        if (event.request?.userId === userData?.id) {
+          toast.error(
+            `Request rejected: ${event.request?.rejectionReason || "No reason provided"}`,
+          );
+          loadUserRequests();
+        }
+        break;
+
+      case "request_cancelled":
+        if (event.request?.userId === userData?.id) {
+          toast.warning("You cancelled your request");
+          loadUserRequests();
+        }
+        break;
+    }
+  });
 
   // Load user data and rides
   useEffect(() => {
@@ -147,12 +235,10 @@ const Dashboard = () => {
 
     loadData();
 
-    // Refresh rides every 60 seconds so past rides are removed dynamically
-    const interval = setInterval(() => {
-      loadData();
-    }, 60 * 1000);
-
-    return () => clearInterval(interval);
+    return () => {
+      // Cleanup WebSocket connections when component unmounts
+      // WebSocket cleanup is handled by the useWebSocket hook
+    };
   }, [
     user,
     userData,
@@ -324,9 +410,15 @@ const Dashboard = () => {
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Available Rides
             </h1>
-            <p className="text-muted-foreground">
-              Find and join rides that match your schedule
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground">
+                Find and join rides that match your schedule
+              </p>
+              <div
+                className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+                title={`WebSocket ${isConnected ? "connected" : "disconnected"}`}
+              />
+            </div>
           </div>
           <Button
             onClick={() => setShowCreateModal(true)}
