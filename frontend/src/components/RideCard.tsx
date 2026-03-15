@@ -3,10 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Ride, fetchRideById } from "@/services/rideApi";
-import { acceptRideRequest, rejectRideRequest } from "@/services/ride_requestsApi";
+import {
+  acceptRideRequest,
+  rejectRideRequest,
+} from "@/services/ride_requestsApi";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 interface Participant {
   id: string; // user id
@@ -41,7 +45,10 @@ export const RideCard = ({
 }: RideCardProps) => {
   const isDriver = ride.createdBy === currentUserId;
   const isParticipant = requestStatus === "ACCEPTED";
-  const [availableSeats, setAvailableSeats] = useState(ride.availableSeats ?? 0);
+  const { joinRide, leaveRide } = useWebSocket();
+  const [availableSeats, setAvailableSeats] = useState(
+    ride.availableSeats ?? 0,
+  );
   const isFull = (availableSeats ?? 0) === 0;
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
@@ -50,6 +57,22 @@ export const RideCard = ({
   useEffect(() => {
     setAvailableSeats(ride.availableSeats ?? 0);
   }, [ride.availableSeats]);
+
+  // Join ride room when user is driver or participant to receive real-time updates
+  useEffect(() => {
+    if (isDriver || isParticipant) {
+      joinRide(ride.id);
+      console.log(`Joined ride room: ${ride.id}`);
+    }
+
+    // Leave room when component unmounts or user is no longer driver/participant
+    return () => {
+      if (isDriver || isParticipant) {
+        leaveRide(ride.id);
+        console.log(`Left ride room: ${ride.id}`);
+      }
+    };
+  }, [isDriver, isParticipant, ride.id, joinRide, leaveRide]);
 
   useEffect(() => {
     // Only fetch participants if user is driver or accepted participant
@@ -92,11 +115,16 @@ export const RideCard = ({
   };
 
   const handleReject = async (requestId: string) => {
-    const reason = window.prompt("Please provide a reason for rejecting this request:");
+    const reason = window.prompt(
+      "Please provide a reason for rejecting this request:",
+    );
     if (reason === null) return; // User cancelled
 
     try {
-      await rejectRideRequest(requestId, { leaderId: currentUserId, rejectionReason: reason });
+      await rejectRideRequest(requestId, {
+        leaderId: currentUserId,
+        rejectionReason: reason,
+      });
       toast.success("Request rejected");
       // refresh participants
       const rideDetails = await fetchRideById(ride.id);
@@ -112,7 +140,9 @@ export const RideCard = ({
   };
 
   const pendingRequests = participants.filter((p) => p.status === "PENDING");
-  const confirmedParticipants = participants.filter((p) => p.status === "ACCEPTED");
+  const confirmedParticipants = participants.filter(
+    (p) => p.status === "ACCEPTED",
+  );
 
   const getGenderBadgeColor = (gender: string) => {
     switch (gender) {
@@ -140,17 +170,26 @@ export const RideCard = ({
                 </Badge>
               )}
               {requestStatus === "PENDING" && (
-                <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">
+                <Badge
+                  variant="outline"
+                  className="text-yellow-600 border-yellow-200 bg-yellow-50"
+                >
                   Requested
                 </Badge>
               )}
               {requestStatus === "REJECTED" && (
-                <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
+                <Badge
+                  variant="outline"
+                  className="text-red-600 border-red-200 bg-red-50"
+                >
                   Rejected
                 </Badge>
               )}
               {isParticipant && (
-                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                <Badge
+                  variant="outline"
+                  className="text-green-600 border-green-200 bg-green-50"
+                >
                   Joined
                 </Badge>
               )}
@@ -158,15 +197,22 @@ export const RideCard = ({
             {/* Leader Info */}
             <div className="flex flex-col gap-1 mb-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-primary">{ride.leaderName}</span>
+                <span className="text-sm font-semibold text-primary">
+                  {ride.leaderName}
+                </span>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
                   <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                  <span>{Number(ride.leaderRating || 0).toFixed(1)} <span className="text-[10px] opacity-70">({ride.leaderTotalReviews || 0})</span></span>
+                  <span>
+                    {Number(ride.leaderRating || 0).toFixed(1)}{" "}
+                    <span className="text-[10px] opacity-70">
+                      ({ride.leaderTotalReviews || 0})
+                    </span>
+                  </span>
                 </div>
               </div>
               {isParticipant && leaderPhone && (
                 <div className="flex items-center gap-1 text-xs font-mono text-muted-foreground">
-                   <span>📞 {leaderPhone}</span>
+                  <span>📞 {leaderPhone}</span>
                 </div>
               )}
             </div>
@@ -180,7 +226,8 @@ export const RideCard = ({
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-primary" />
                 <span>
-                  {ride.rideTime} • {new Date(ride.rideDate).toLocaleDateString()}
+                  {ride.rideTime} •{" "}
+                  {new Date(ride.rideDate).toLocaleDateString()}
                 </span>
               </div>
             </div>
@@ -192,7 +239,7 @@ export const RideCard = ({
                 "status-badge",
                 isFull
                   ? "bg-[hsl(var(--status-full))] text-white"
-                  : "bg-[hsl(var(--status-available))] text-white"
+                  : "bg-[hsl(var(--status-available))] text-white",
               )}
             >
               {isFull ? "Full" : `${availableSeats} Seats`}
@@ -206,8 +253,7 @@ export const RideCard = ({
         <div className="flex items-center gap-2 text-sm">
           <Users className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">
-            {ride.totalSeats - availableSeats}/{ride.totalSeats} seats
-            filled
+            {ride.totalSeats - availableSeats}/{ride.totalSeats} seats filled
           </span>
         </div>
 
@@ -216,7 +262,6 @@ export const RideCard = ({
         {/* Participants & Requests List */}
         {(isDriver || isParticipant) && (
           <div className="border-t border-border/50 pt-4 mb-4 space-y-4">
-            
             {/* Pending Requests (Driver Only) */}
             {isDriver && pendingRequests.length > 0 && (
               <div className="space-y-2">
@@ -226,32 +271,41 @@ export const RideCard = ({
                 </h4>
                 <div className="space-y-2">
                   {pendingRequests.map((p) => (
-                    <div key={p.id} className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-100 flex flex-col gap-2">
+                    <div
+                      key={p.id}
+                      className="bg-yellow-50/50 p-3 rounded-lg border border-yellow-100 flex flex-col gap-2"
+                    >
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="font-medium text-sm flex items-center gap-2">
                             {p.fullName}
-                            <Badge variant="outline" className="text-[10px] px-1 h-4">
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] px-1 h-4"
+                            >
                               {p.gender}
                             </Badge>
                           </div>
                           <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                            <span>{Number(p.averageRating).toFixed(1)} ({p.totalReviews} reviews)</span>
+                            <span>
+                              {Number(p.averageRating).toFixed(1)} (
+                              {p.totalReviews} reviews)
+                            </span>
                           </div>
                         </div>
                         <div className="flex gap-1">
-                          <Button 
-                            size="icon" 
-                            variant="outline" 
+                          <Button
+                            size="icon"
+                            variant="outline"
                             className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
                             onClick={() => handleAccept(p.requestId)}
                           >
                             <Check className="h-4 w-4" />
                           </Button>
-                          <Button 
-                            size="icon" 
-                            variant="outline" 
+                          <Button
+                            size="icon"
+                            variant="outline"
                             className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                             onClick={() => handleReject(p.requestId)}
                           >
@@ -266,40 +320,50 @@ export const RideCard = ({
             )}
 
             {/* Confirmed Participants */}
-             <div>
-               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                 <Users className="w-4 h-4 text-primary" />
-                 Confirmed Participants ({confirmedParticipants.length})
-               </h4>
-               {loadingParticipants ? (
-                 <div className="text-xs text-muted-foreground animate-pulse">Loading participants...</div>
-               ) : confirmedParticipants.length > 0 ? (
-                 <div className="space-y-2">
-                   {confirmedParticipants.map((p) => (
-                     <div key={p.id} className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded border border-border/50">
-                       <div className="flex flex-col">
-                         <div className="flex items-center gap-2">
-                           <span className="font-medium">{p.fullName}</span>
-                           <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
-                             {p.gender}
-                           </Badge>
-                         </div>
-                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                            <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                            <span>{Number(p.averageRating).toFixed(1)}</span>
-                          </div>
-                       </div>
-                       {isDriver && (
-                         <span className="text-xs text-muted-foreground font-mono bg-background px-1 rounded border">
-                           {p.whatsappNumber}
-                         </span>
-                       )}
-                     </div>
-                   ))}
-                 </div>
-               ) : (
-                 <p className="text-xs text-muted-foreground italic">No confirmed participants yet</p>
-               )}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                Confirmed Participants ({confirmedParticipants.length})
+              </h4>
+              {loadingParticipants ? (
+                <div className="text-xs text-muted-foreground animate-pulse">
+                  Loading participants...
+                </div>
+              ) : confirmedParticipants.length > 0 ? (
+                <div className="space-y-2">
+                  {confirmedParticipants.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded border border-border/50"
+                    >
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{p.fullName}</span>
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1 py-0 h-4"
+                          >
+                            {p.gender}
+                          </Badge>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          <span>{Number(p.averageRating).toFixed(1)}</span>
+                        </div>
+                      </div>
+                      {isDriver && (
+                        <span className="text-xs text-muted-foreground font-mono bg-background px-1 rounded border">
+                          {p.whatsappNumber}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground italic">
+                  No confirmed participants yet
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -313,7 +377,7 @@ export const RideCard = ({
                 onClick={() => {
                   if (typeof onDeleteRide === "function") {
                     const reason = window.prompt(
-                      "WARNING: You are about to cancel this ride.\n\nThis will notify all participants and cannot be undone.\n\nPlease provide a reason for cancellation:"
+                      "WARNING: You are about to cancel this ride.\n\nThis will notify all participants and cannot be undone.\n\nPlease provide a reason for cancellation:",
                     );
                     if (reason !== null) {
                       if (!reason.trim()) {
@@ -335,7 +399,11 @@ export const RideCard = ({
                   variant="outline"
                   className="flex-1 hover:bg-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive-foreground))] transition-all duration-200"
                   onClick={() => {
-                    if (window.confirm("Warning: Leaving a confirmed ride may affect your rating. Are you sure you want to proceed?")) {
+                    if (
+                      window.confirm(
+                        "Warning: Leaving a confirmed ride may affect your rating. Are you sure you want to proceed?",
+                      )
+                    ) {
                       onLeaveRide(ride.id);
                     }
                   }}
@@ -343,19 +411,23 @@ export const RideCard = ({
                   Leave Ride
                 </Button>
               ) : requestStatus === "PENDING" ? (
-                 <Button
+                <Button
                   disabled
                   className="flex-1 bg-yellow-100 text-yellow-800 border-yellow-200 opacity-80"
-                 >
-                   Requested
-                 </Button>
-               ) : requestStatus === "REJECTED" ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-2 bg-red-50 rounded border border-red-100">
-                   <span className="text-xs font-semibold text-red-700">Request Rejected</span>
-                   {rejectionReason && (
-                     <span className="text-xs text-red-600 italic mt-0.5 text-center">"{rejectionReason}"</span>
-                   )}
-                 </div>
+                >
+                  Requested
+                </Button>
+              ) : requestStatus === "REJECTED" ? (
+                <div className="flex-1 flex flex-col items-center justify-center p-2 bg-red-50 rounded border border-red-100">
+                  <span className="text-xs font-semibold text-red-700">
+                    Request Rejected
+                  </span>
+                  {rejectionReason && (
+                    <span className="text-xs text-red-600 italic mt-0.5 text-center">
+                      "{rejectionReason}"
+                    </span>
+                  )}
+                </div>
               ) : (
                 <Button
                   className="btn-primary flex-1 transition-all duration-200"

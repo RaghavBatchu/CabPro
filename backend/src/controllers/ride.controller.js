@@ -1,7 +1,14 @@
-import { db } from "../../Database/database.js"
+import { db } from "../../Database/database.js";
 import rides from "../models/ride.model.js";
 import rideRequests from "../models/ride_requests.model.js";
 import users from "../models/user.model.js";
+import {
+  emitRideCreated,
+  emitRideUpdated,
+  emitRideCancelled,
+  emitRideStarted,
+  emitRideCompleted,
+} from "../websocket/rideEvents.js";
 
 import { eq, and, inArray, sql, lt, or } from "drizzle-orm";
 
@@ -22,38 +29,52 @@ export const createRide = async (req, res) => {
       pricePerKm,
       estimatedDistanceKm,
       estimatedDurationMin,
-      genderPreference
+      genderPreference,
     } = req.body;
 
-    if (!createdBy || !rideType || !origin || !destination || !rideDate || !rideTime || !totalSeats || !pricingType) {
+    if (
+      !createdBy ||
+      !rideType ||
+      !origin ||
+      !destination ||
+      !rideDate ||
+      !rideTime ||
+      !totalSeats ||
+      !pricingType
+    ) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const [h, m] = rideTime.split(":").map(Number);
     const timeMinutes = h * 60 + (m || 0);
 
-    const ride = await db.insert(rides).values({
-      createdBy,
-      rideType,
-      origin,
-      destination,
-      rideDate: new Date(rideDate),
-      rideTime,
-      timeMinutes,
-      totalSeats,
-      availableSeats: totalSeats,
-      pricingType,
-      pricePerHead,
-      basePrice,
-      pricePerKm,
-      estimatedDistanceKm,
-      estimatedDurationMin,
-      genderPreference: genderPreference || "ALL",
-      status: "OPEN"
-    }).returning();
+    const ride = await db
+      .insert(rides)
+      .values({
+        createdBy,
+        rideType,
+        origin,
+        destination,
+        rideDate: new Date(rideDate),
+        rideTime,
+        timeMinutes,
+        totalSeats,
+        availableSeats: totalSeats,
+        pricingType,
+        pricePerHead,
+        basePrice,
+        pricePerKm,
+        estimatedDistanceKm,
+        estimatedDurationMin,
+        genderPreference: genderPreference || "ALL",
+        status: "OPEN",
+      })
+      .returning();
+
+    // Emit WebSocket event for new ride
+    emitRideCreated(ride[0]);
 
     res.status(201).json(ride[0]);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -65,19 +86,22 @@ export const getRides = async (req, res) => {
     // Auto-mark past rides as COMPLETED
     const now = new Date();
     // Use UTC date to match how dates are typically stored from frontend
-    const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const today = new Date(
+      Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+    );
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    await db.update(rides)
+    await db
+      .update(rides)
       .set({ status: "COMPLETED" })
       .where(
         and(
           inArray(rides.status, ["OPEN", "FULL"]),
           or(
             lt(rides.rideDate, today),
-            and(eq(rides.rideDate, today), lt(rides.timeMinutes, nowMinutes))
-          )
-        )
+            and(eq(rides.rideDate, today), lt(rides.timeMinutes, nowMinutes)),
+          ),
+        ),
       );
 
     const {
@@ -87,7 +111,7 @@ export const getRides = async (req, res) => {
       time,
       flexible = "exact", // exact | 30m | 1h
       minSeats,
-      userGender
+      userGender,
     } = req.query;
 
     const conditions = [];
@@ -95,10 +119,11 @@ export const getRides = async (req, res) => {
     if (origin) conditions.push(eq(rides.origin, origin));
     if (destination) conditions.push(eq(rides.destination, destination));
     if (date) conditions.push(eq(rides.rideDate, new Date(date)));
-    if (minSeats) conditions.push(sql`${rides.availableSeats} >= ${Number(minSeats)}`);
+    if (minSeats)
+      conditions.push(sql`${rides.availableSeats} >= ${Number(minSeats)}`);
     if (userGender) {
       conditions.push(
-        sql`(${rides.genderPreference} = 'ALL' OR ${rides.genderPreference} = ${userGender})`
+        sql`(${rides.genderPreference} = 'ALL' OR ${rides.genderPreference} = ${userGender})`,
       );
     }
 
@@ -114,7 +139,7 @@ export const getRides = async (req, res) => {
         conditions.push(eq(rides.timeMinutes, requestedMinutes));
       } else {
         conditions.push(
-          sql`ABS(${rides.timeMinutes} - ${requestedMinutes}) <= ${window}`
+          sql`ABS(${rides.timeMinutes} - ${requestedMinutes}) <= ${window}`,
         );
       }
     }
@@ -126,7 +151,7 @@ export const getRides = async (req, res) => {
         ...rides,
         leaderName: users.fullName,
         leaderRating: users.averageRating,
-        leaderTotalReviews: users.totalReviews
+        leaderTotalReviews: users.totalReviews,
       })
       .from(rides)
       .innerJoin(users, eq(rides.createdBy, users.id))
@@ -134,7 +159,6 @@ export const getRides = async (req, res) => {
       .orderBy(rides.rideDate, rides.timeMinutes);
 
     res.status(200).json(result);
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -151,7 +175,7 @@ export const getRideById = async (req, res) => {
         leaderName: users.fullName,
         leaderPhone: users.whatsappNumber,
         leaderRating: users.averageRating,
-        leaderTotalReviews: users.totalReviews
+        leaderTotalReviews: users.totalReviews,
       })
       .from(rides)
       .innerJoin(users, eq(rides.createdBy, users.id))
@@ -171,7 +195,7 @@ export const getRideById = async (req, res) => {
         averageRating: users.averageRating,
         totalReviews: users.totalReviews,
         status: rideRequests.status,
-        requestId: rideRequests.id
+        requestId: rideRequests.id,
       })
       .from(rideRequests)
       .innerJoin(users, eq(rideRequests.userId, users.id))
@@ -179,9 +203,8 @@ export const getRideById = async (req, res) => {
 
     res.status(200).json({
       ...ride[0],
-      participants
+      participants,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -193,12 +216,10 @@ export const startRide = async (req, res) => {
   const { leaderId } = req.body;
 
   try {
-    const ride = await db
-      .select()
-      .from(rides)
-      .where(eq(rides.id, id));
+    const ride = await db.select().from(rides).where(eq(rides.id, id));
 
-    if (!ride.length) return res.status(404).json({ message: "Ride not found" });
+    if (!ride.length)
+      return res.status(404).json({ message: "Ride not found" });
 
     if (ride[0].createdBy !== leaderId) {
       return res.status(403).json({ message: "Only leader can start ride" });
@@ -208,12 +229,12 @@ export const startRide = async (req, res) => {
       return res.status(400).json({ message: "Ride is cancelled" });
     }
 
-    await db.update(rides)
-      .set({ status: "STARTED" })
-      .where(eq(rides.id, id));
+    await db.update(rides).set({ status: "STARTED" }).where(eq(rides.id, id));
+
+    // Emit WebSocket event for ride started
+    emitRideStarted(id);
 
     res.status(200).json({ message: "Ride started" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -225,23 +246,21 @@ export const completeRide = async (req, res) => {
   const { leaderId } = req.body;
 
   try {
-    const ride = await db
-      .select()
-      .from(rides)
-      .where(eq(rides.id, id));
+    const ride = await db.select().from(rides).where(eq(rides.id, id));
 
-    if (!ride.length) return res.status(404).json({ message: "Ride not found" });
+    if (!ride.length)
+      return res.status(404).json({ message: "Ride not found" });
 
     if (ride[0].createdBy !== leaderId) {
       return res.status(403).json({ message: "Only leader can complete ride" });
     }
 
-    await db.update(rides)
-      .set({ status: "COMPLETED" })
-      .where(eq(rides.id, id));
+    await db.update(rides).set({ status: "COMPLETED" }).where(eq(rides.id, id));
+
+    // Emit WebSocket event for ride completed
+    emitRideCompleted(id);
 
     res.status(200).json({ message: "Ride completed" });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -253,12 +272,10 @@ export const cancelRide = async (req, res) => {
   const { leaderId, reason } = req.body;
 
   try {
-    const ride = await db
-      .select()
-      .from(rides)
-      .where(eq(rides.id, id));
+    const ride = await db.select().from(rides).where(eq(rides.id, id));
 
-    if (!ride.length) return res.status(404).json({ message: "Ride not found" });
+    if (!ride.length)
+      return res.status(404).json({ message: "Ride not found" });
 
     if (ride[0].createdBy !== leaderId) {
       return res.status(403).json({ message: "Only leader can cancel ride" });
@@ -268,15 +285,18 @@ export const cancelRide = async (req, res) => {
       return res.status(400).json({ message: "Ride is already finalized" });
     }
 
-    await db.update(rides)
+    await db
+      .update(rides)
       .set({
         status: "CANCELLED",
-        cancellationReason: reason
+        cancellationReason: reason,
       })
       .where(eq(rides.id, id));
 
-    res.status(200).json({ message: "Ride cancelled" });
+    // Emit WebSocket event for ride cancelled
+    emitRideCancelled(id, reason);
 
+    res.status(200).json({ message: "Ride cancelled" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -15,9 +15,19 @@ import { TimePicker } from "@/components/ui/time-picker";
 import { toast } from "sonner";
 import { fetchRides, Ride, RideFilters } from "@/services/rideApi";
 import { cancelRide } from "@/services/rideApi";
-import { sendJoinRequest, rejectRideRequest, cancelRideRequest, fetchUserRequests } from "@/services/ride_requestsApi";
+import {
+  sendJoinRequest,
+  rejectRideRequest,
+  cancelRideRequest,
+  fetchUserRequests,
+} from "@/services/ride_requestsApi";
 import { useUser } from "@clerk/clerk-react";
 import { fetchUserByEmail } from "@/services/userApi";
+import {
+  useWebSocket,
+  useRideEvents,
+  useRequestEvents,
+} from "@/hooks/useWebSocket";
 
 const Dashboard = () => {
   const { user } = useUser();
@@ -33,9 +43,18 @@ const Dashboard = () => {
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
   const [originOptions, setOriginOptions] = useState<string[]>([]);
   const [destinationOptions, setDestinationOptions] = useState<string[]>([]);
-  const [userRequestsMap, setUserRequestsMap] = useState<Record<string, string>>({});
-  const [userRequestIdsMap, setUserRequestIdsMap] = useState<Record<string, string>>({});
-  const [userRejectionReasonsMap, setUserRejectionReasonsMap] = useState<Record<string, string>>({});
+  const [userRequestsMap, setUserRequestsMap] = useState<
+    Record<string, string>
+  >({});
+  const [userRequestIdsMap, setUserRequestIdsMap] = useState<
+    Record<string, string>
+  >({});
+  const [userRejectionReasonsMap, setUserRejectionReasonsMap] = useState<
+    Record<string, string>
+  >({});
+
+  // WebSocket connection
+  const { isConnected } = useWebSocket({ userId: userData?.id });
 
   const loadUserRequests = async () => {
     if (!userData?.id) return;
@@ -48,7 +67,7 @@ const Dashboard = () => {
         map[req.rideId] = req.status;
         idMap[req.rideId] = req.id;
         if (req.rejectionReason) {
-            rejectionMap[req.rideId] = req.rejectionReason;
+          rejectionMap[req.rideId] = req.rejectionReason;
         }
       });
       setUserRequestsMap(map);
@@ -63,16 +82,102 @@ const Dashboard = () => {
     loadUserRequests();
   }, [userData]);
 
-  const origins = originOptions.length > 0 ? originOptions : Array.from(new Set(rides.map((r) => r.origin)));
-  const destinations = destinationOptions.length > 0 ? destinationOptions : Array.from(new Set(rides.map((r) => r.destination)));
+  const origins =
+    originOptions.length > 0
+      ? originOptions
+      : Array.from(new Set(rides.map((r) => r.origin)));
+  const destinations =
+    destinationOptions.length > 0
+      ? destinationOptions
+      : Array.from(new Set(rides.map((r) => r.destination)));
 
   const todayYmd = (() => {
     const d = new Date();
     const y = d.getFullYear();
-    const m = (d.getMonth() + 1).toString().padStart(2, '0');
-    const day = d.getDate().toString().padStart(2, '0');
+    const m = (d.getMonth() + 1).toString().padStart(2, "0");
+    const day = d.getDate().toString().padStart(2, "0");
     return `${y}-${m}-${day}`;
   })();
+
+  // WebSocket event handlers for real-time updates
+  useRideEvents((event) => {
+    console.log("Ride event received:", event);
+
+    switch (event.type) {
+      case "ride_created":
+        if (event.ride) {
+          setRides((prev) => [...prev, event.ride]);
+          toast.success("New ride created!");
+        }
+        break;
+
+      case "ride_updated":
+        if (event.rideId && event.updatedData) {
+          setRides((prev) =>
+            prev.map((ride) =>
+              ride.id === event.rideId
+                ? { ...ride, ...event.updatedData }
+                : ride,
+            ),
+          );
+        }
+        break;
+
+      case "ride_cancelled":
+        if (event.rideId) {
+          setRides((prev) => prev.filter((ride) => ride.id !== event.rideId));
+          toast.error("Ride cancelled");
+        }
+        break;
+
+      case "ride_started":
+        if (event.rideId) {
+          setRides((prev) =>
+            prev.map((ride) =>
+              ride.id === event.rideId ? { ...ride, status: "STARTED" } : ride,
+            ),
+          );
+          toast.info("Ride started!");
+        }
+        break;
+
+      case "ride_completed":
+        if (event.rideId) {
+          setRides((prev) => prev.filter((ride) => ride.id !== event.rideId));
+          toast.success("Ride completed!");
+        }
+        break;
+    }
+  });
+
+  useRequestEvents((event) => {
+    console.log("Request event received:", event);
+
+    switch (event.type) {
+      case "request_accepted":
+        if (event.request?.userId === userData?.id) {
+          toast.success("Your join request was accepted!");
+          loadUserRequests();
+        }
+        break;
+
+      case "request_rejected":
+        if (event.request?.userId === userData?.id) {
+          toast.error(
+            `Request rejected: ${event.request?.rejectionReason || "No reason provided"}`,
+          );
+          loadUserRequests();
+        }
+        break;
+
+      case "request_cancelled":
+        if (event.request?.userId === userData?.id) {
+          toast.warning("You cancelled your request");
+          loadUserRequests();
+        }
+        break;
+    }
+  });
 
   // Load user data and rides
   useEffect(() => {
@@ -84,20 +189,23 @@ const Dashboard = () => {
         let effectiveUserData = userData;
         if (user?.primaryEmailAddress?.emailAddress && !effectiveUserData) {
           try {
-            const userInfo = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+            const userInfo = await fetchUserByEmail(
+              user.primaryEmailAddress.emailAddress,
+            );
             // fetchUserByEmail returns an array, get the first element
             const userObj = Array.isArray(userInfo) ? userInfo[0] : userInfo;
             setUserData(userObj);
             effectiveUserData = userObj;
           } catch (err) {
-            console.error('Failed to load user data:', err);
+            console.error("Failed to load user data:", err);
           }
         }
 
         // Load rides with current filters
         const filters: RideFilters = {};
         if (originFilter !== "all") filters.origin = originFilter;
-        if (destinationFilter !== "all") filters.destination = destinationFilter;
+        if (destinationFilter !== "all")
+          filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
         // Gender preference is part of the Ride model, not a filter
@@ -107,12 +215,16 @@ const Dashboard = () => {
           filters.userGender = effectiveUserData.gender;
         }
 
-    const ridesData = await fetchRides(filters);
-    setRides(ridesData);
-    const newOrigins = Array.from(new Set(ridesData.map((r:any) => r.origin))).filter(Boolean);
-    const newDestinations = Array.from(new Set(ridesData.map((r:any) => r.destination))).filter(Boolean);
-    if (newOrigins.length > 0) setOriginOptions(newOrigins);
-    if (newDestinations.length > 0) setDestinationOptions(newDestinations);
+        const ridesData = await fetchRides(filters);
+        setRides(ridesData);
+        const newOrigins = Array.from(
+          new Set(ridesData.map((r: any) => r.origin)),
+        ).filter(Boolean);
+        const newDestinations = Array.from(
+          new Set(ridesData.map((r: any) => r.destination)),
+        ).filter(Boolean);
+        if (newOrigins.length > 0) setOriginOptions(newOrigins);
+        if (newDestinations.length > 0) setDestinationOptions(newDestinations);
       } catch (error) {
         console.error("Failed to load data:", error);
         toast.error("Failed to load rides");
@@ -123,14 +235,20 @@ const Dashboard = () => {
 
     loadData();
 
-    // Refresh rides every 60 seconds so past rides are removed dynamically
-    const interval = setInterval(() => {
-      loadData();
-    }, 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [user, userData, originFilter, destinationFilter, dateFilter, timeFilter, genderFilter, seatsFilter]);
-
+    return () => {
+      // Cleanup WebSocket connections when component unmounts
+      // WebSocket cleanup is handled by the useWebSocket hook
+    };
+  }, [
+    user,
+    userData,
+    originFilter,
+    destinationFilter,
+    dateFilter,
+    timeFilter,
+    genderFilter,
+    seatsFilter,
+  ]);
 
   const filteredRides = rides;
 
@@ -142,7 +260,9 @@ const Dashboard = () => {
 
     try {
       await sendJoinRequest({ rideId, userId: userData.id });
-      toast.success("Join request sent successfully! Waiting for leader approval.");
+      toast.success(
+        "Join request sent successfully! Waiting for leader approval.",
+      );
       // Reload requests to update UI
       loadUserRequests();
       // Optionally reload rides to show updated request status
@@ -167,7 +287,7 @@ const Dashboard = () => {
       toast.error("User data not available");
       return;
     }
-    
+
     const requestId = userRequestIdsMap[rideId];
     if (!requestId) {
       toast.error("Request not found for this ride");
@@ -176,10 +296,12 @@ const Dashboard = () => {
 
     try {
       await cancelRideRequest(requestId);
-      toast.warning("You have left the ride. Frequent cancellations are discouraged.");
+      toast.warning(
+        "You have left the ride. Frequent cancellations are discouraged.",
+      );
       // Reload user requests to update status maps
       await loadUserRequests();
-      
+
       // Reload rides to show updated status
       const filters: RideFilters = {};
       if (originFilter !== "all") filters.origin = originFilter;
@@ -231,7 +353,7 @@ const Dashboard = () => {
 
     try {
       await cancelRide(rideId, userData.id, reason);
-      setRides(prev => prev.filter(r => r.id !== rideId));
+      setRides((prev) => prev.filter((r) => r.id !== rideId));
       toast.success("Ride cancelled successfully");
     } catch (error: any) {
       console.error("Failed to delete ride:", error);
@@ -247,19 +369,22 @@ const Dashboard = () => {
         let effectiveUserData = userData;
         if (!effectiveUserData && user?.primaryEmailAddress?.emailAddress) {
           try {
-            const ud = await fetchUserByEmail(user.primaryEmailAddress.emailAddress);
+            const ud = await fetchUserByEmail(
+              user.primaryEmailAddress.emailAddress,
+            );
             // fetchUserByEmail returns an array, get the first element
             const userObj = Array.isArray(ud) ? ud[0] : ud;
             setUserData(userObj);
             effectiveUserData = userObj;
           } catch (err) {
-            console.error('Failed to fetch user data during reload:', err);
+            console.error("Failed to fetch user data during reload:", err);
           }
         }
 
         const filters: RideFilters = {};
         if (originFilter !== "all") filters.origin = originFilter;
-        if (destinationFilter !== "all") filters.destination = destinationFilter;
+        if (destinationFilter !== "all")
+          filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
         if (timeFilter) filters.time = timeFilter;
         // Gender preference is part of the Ride model, not a filter
@@ -285,11 +410,17 @@ const Dashboard = () => {
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Available Rides
             </h1>
-            <p className="text-muted-foreground">
-              Find and join rides that match your schedule
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground">
+                Find and join rides that match your schedule
+              </p>
+              <div
+                className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-red-500"}`}
+                title={`WebSocket ${isConnected ? "connected" : "disconnected"}`}
+              />
+            </div>
           </div>
-          <Button 
+          <Button
             onClick={() => setShowCreateModal(true)}
             className="btn-primary"
           >
@@ -325,7 +456,10 @@ const Dashboard = () => {
             <label className="text-sm font-medium text-foreground mb-2 block">
               Destination
             </label>
-            <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+            <Select
+              value={destinationFilter}
+              onValueChange={setDestinationFilter}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All destinations" />
               </SelectTrigger>
@@ -407,21 +541,23 @@ const Dashboard = () => {
           </div>
         ) : filteredRides.length > 0 ? (
           filteredRides.map((ride) => (
-              <RideCard
-                key={ride.id}
-                ride={ride}
-                currentUserId={userData?.id || ""}
-                onJoinRide={handleJoinRide}
-                onLeaveRide={handleLeaveRide}
-                onDeleteRide={handleDeleteRide}
-                requestStatus={userRequestsMap[ride.id] as any}
-                rejectionReason={userRejectionReasonsMap[ride.id]}
-              />
+            <RideCard
+              key={ride.id}
+              ride={ride}
+              currentUserId={userData?.id || ""}
+              onJoinRide={handleJoinRide}
+              onLeaveRide={handleLeaveRide}
+              onDeleteRide={handleDeleteRide}
+              requestStatus={userRequestsMap[ride.id] as any}
+              rejectionReason={userRejectionReasonsMap[ride.id]}
+            />
           ))
         ) : (
           <div className="col-span-full text-center py-12">
-            <p className="text-lg text-muted-foreground mb-4">No rides match your filters</p>
-            <Button 
+            <p className="text-lg text-muted-foreground mb-4">
+              No rides match your filters
+            </p>
+            <Button
               onClick={() => setShowCreateModal(true)}
               className="btn-primary"
             >
@@ -438,7 +574,8 @@ const Dashboard = () => {
         onRideCreated={handleRideCreated}
         initialFilters={{
           origin: originFilter !== "all" ? originFilter : undefined,
-          destination: destinationFilter !== "all" ? destinationFilter : undefined,
+          destination:
+            destinationFilter !== "all" ? destinationFilter : undefined,
           date: dateFilter || undefined,
           time: timeFilter || undefined,
         }}

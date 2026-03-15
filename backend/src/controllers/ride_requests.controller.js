@@ -3,6 +3,14 @@ import rideRequests from "../models/ride_requests.model.js";
 import rides from "../models/ride.model.js";
 import users from "../models/user.model.js";
 import { sendJoinRequestEmail } from "../utils/emailService.js";
+import {
+  emitRequestSent,
+  emitRequestAccepted,
+  emitRequestRejected,
+  emitRequestCancelled,
+  emitParticipantJoined,
+  emitParticipantLeft,
+} from "../websocket/rideEvents.js";
 
 import { eq, and } from "drizzle-orm";
 
@@ -49,9 +57,23 @@ export const sendJoinRequest = async (req, res) => {
       return res.status(404).json({ message: "Ride leader not found" });
     }
 
-    await db.insert(rideRequests).values({
+    const newRequest = await db
+      .insert(rideRequests)
+      .values({
+        rideId,
+        userId,
+      })
+      .returning();
+
+    // Emit WebSocket event for new request
+    emitRequestSent({
+      id: newRequest[0].id,
       rideId,
       userId,
+      rideLeaderId: ride[0].createdBy,
+      status: "PENDING",
+      participantName: participant[0].fullName,
+      rideDetails: ride[0],
     });
 
     // Send email notification to ride leader
@@ -139,15 +161,33 @@ export const acceptRequest = async (req, res) => {
         .where(eq(rideRequests.id, id));
 
       const newSeats = ride[0].availableSeats - 1;
+      const updatedRideStatus = newSeats === 0 ? "FULL" : ride[0].status;
 
       // Decrement seat
       await tx
         .update(rides)
         .set({
           availableSeats: newSeats,
-          status: newSeats === 0 ? "FULL" : ride[0].status,
+          status: updatedRideStatus,
         })
         .where(eq(rides.id, ride[0].id));
+
+      // Emit WebSocket events
+      emitRequestAccepted({
+        id,
+        rideId: request[0].rideId,
+        userId: request[0].userId,
+        rideLeaderId: leaderId,
+        status: "ACCEPTED",
+      });
+
+      emitParticipantJoined(request[0].rideId, {
+        userId: request[0].userId,
+        fullName: user[0].fullName,
+        gender: user[0].gender,
+        averageRating: user[0].averageRating,
+        totalReviews: user[0].totalReviews,
+      });
     });
 
     res.status(200).json({ message: "Request accepted" });
@@ -190,6 +230,16 @@ export const rejectRequest = async (req, res) => {
           rejectionReason: rejectionReason || null,
         })
         .where(eq(rideRequests.id, id));
+
+      // Emit WebSocket event for rejected request
+      emitRequestRejected({
+        id,
+        rideId: request[0].rideId,
+        userId: request[0].userId,
+        rideLeaderId: leaderId,
+        status: "REJECTED",
+        rejectionReason: rejectionReason || null,
+      });
     });
 
     res.status(200).json({ message: "Request rejected" });
@@ -239,6 +289,31 @@ export const cancelRequest = async (req, res) => {
           respondedAt: new Date(),
         })
         .where(eq(rideRequests.id, id));
+
+      // Emit WebSocket events
+      emitRequestCancelled({
+        id,
+        rideId: request[0].rideId,
+        userId: request[0].userId,
+        rideLeaderId: ride[0].createdBy,
+        status: "CANCELLED",
+      });
+
+      // If request was ACCEPTED, also emit participant left event
+      if (request[0].status === "ACCEPTED") {
+        const user = await tx
+          .select()
+          .from(users)
+          .where(eq(users.id, request[0].userId));
+
+        if (user.length) {
+          emitParticipantLeft(request[0].rideId, {
+            userId: request[0].userId,
+            fullName: user[0].fullName,
+            gender: user[0].gender,
+          });
+        }
+      }
     });
 
     res.status(200).json({ message: "Request cancelled" });
