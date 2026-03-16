@@ -1,5 +1,5 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { DB_URI } from "../src/config/env.js";
 
 if (!DB_URI) {
@@ -18,7 +18,8 @@ const connectDB = async () => {
     console.log("Database connected successfully");
   } catch (error) {
     console.error("Database connection failed:", error);
-    process.exit(1);
+    // Don't exit process, just log the error and continue
+    console.log("Server will continue running without database connection");
   }
 };
 
