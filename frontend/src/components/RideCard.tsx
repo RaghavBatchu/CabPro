@@ -1,4 +1,4 @@
-import { Users, Clock, MapPin, Star, Check, X, IndianRupee } from "lucide-react";
+import { Users, Clock, MapPin, Star, Check, X, IndianRupee, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -27,7 +27,7 @@ interface Participant {
 interface RideCardProps {
   ride: Ride;
   currentUserId: string;
-  onJoinRide: (rideId: string) => void;
+  onJoinRide: (rideId: string) => Promise<void> | void;
   onLeaveRide: (rideId: string) => void;
   onDeleteRide?: (rideId: string, reason?: string) => void;
   requestStatus?: "PENDING" | "ACCEPTED" | "REJECTED" | null;
@@ -53,6 +53,7 @@ export const RideCard = ({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [leaderPhone, setLeaderPhone] = useState<string | null>(null);
+  const [joiningRide, setJoiningRide] = useState(false);
 
   useEffect(() => {
     setAvailableSeats(ride.availableSeats ?? 0);
@@ -440,10 +441,19 @@ export const RideCard = ({
               ) : (
                 <Button
                   className="btn-primary flex-1 transition-all duration-200"
-                  disabled={isFull}
-                  onClick={() => onJoinRide(ride.id)}
+                  disabled={isFull || joiningRide}
+                  onClick={async () => {
+                    setJoiningRide(true);
+                    try {
+                      await onJoinRide(ride.id);
+                    } finally {
+                      setJoiningRide(false);
+                    }
+                  }}
                 >
-                  {isFull ? "Ride Full" : "Join Ride"}
+                  {joiningRide ? (
+                    <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Joining...</>
+                  ) : isFull ? "Ride Full" : "Join Ride"}
                 </Button>
               )}
             </>
