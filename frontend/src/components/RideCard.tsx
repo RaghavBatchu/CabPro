@@ -1,4 +1,4 @@
-import { Users, Clock, MapPin, Star, Check, X } from "lucide-react";
+import { Users, Clock, MapPin, Star, Check, X, IndianRupee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -230,6 +230,15 @@ export const RideCard = ({
                   {new Date(ride.rideDate).toLocaleDateString()}
                 </span>
               </div>
+              {ride.pricePerHead && (
+                <div className="flex items-center gap-2">
+                  <IndianRupee className="h-4 w-4 text-emerald-600" />
+                  <span className="font-semibold text-emerald-700">
+                    ₹{Number(ride.pricePerHead).toFixed(0)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/person</span>
+                </div>
+              )}
             </div>
           </div>
 
