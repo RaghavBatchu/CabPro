@@ -7,6 +7,8 @@ import {
   completeRide,
   cancelRide
 } from "../controllers/ride.controller.js";
+import { validate } from "../middleware/validate.js";
+import { createRideSchema } from "../validators/ride.validator.js";
 
 const rideRouter = Router();
 
@@ -25,7 +27,7 @@ rideRouter.get("/:id", getRideById);
 
 // Create ride
 // POST /api/rides
-rideRouter.post("/", createRide);
+rideRouter.post("/", validate(createRideSchema), createRide);
 
 // Start ride (Leader only)
 // POST /api/rides/:id/start
