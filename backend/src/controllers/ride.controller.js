@@ -32,18 +32,7 @@ export const createRide = async (req, res) => {
       genderPreference,
     } = req.body;
 
-    if (
-      !createdBy ||
-      !rideType ||
-      !origin ||
-      !destination ||
-      !rideDate ||
-      !rideTime ||
-      !totalSeats ||
-      !pricingType
-    ) {
-      return res.status(400).json({ message: "Missing required fields" });
-    }
+    // Validation is handled by Zod middleware (see validators/ride.validator.js)
 
     const [h, m] = rideTime.split(":").map(Number);
     const timeMinutes = h * 60 + (m || 0);
