@@ -20,6 +20,7 @@ const corsOptions = {
         "http://127.0.0.1:5174",
         "http://localhost:8081",
         "http://127.0.0.1:8081",
+        "https://cab-pro.vercel.app",
       ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
