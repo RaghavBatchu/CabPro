@@ -39,6 +39,7 @@ const Dashboard = () => {
   const [destinationFilter, setDestinationFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [timeFilter, setTimeFilter] = useState<string>("");
+  const [flexibleFilter, setFlexibleFilter] = useState<string>("exact");
   const [genderFilter, setGenderFilter] = useState<string>("all");
   const [seatsFilter, setSeatsFilter] = useState<string>("all");
   const [originOptions, setOriginOptions] = useState<string[]>([]);
@@ -207,7 +208,10 @@ const Dashboard = () => {
         if (destinationFilter !== "all")
           filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
-        if (timeFilter) filters.time = timeFilter;
+        if (timeFilter) {
+          filters.time = timeFilter;
+          filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
+        }
         // Gender preference is part of the Ride model, not a filter
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
         // Ensure we include the current user's gender so backend can filter rides
@@ -246,6 +250,7 @@ const Dashboard = () => {
     destinationFilter,
     dateFilter,
     timeFilter,
+    flexibleFilter,
     genderFilter,
     seatsFilter,
   ]);
@@ -270,7 +275,10 @@ const Dashboard = () => {
       if (originFilter !== "all") filters.origin = originFilter;
       if (destinationFilter !== "all") filters.destination = destinationFilter;
       if (dateFilter) filters.date = dateFilter;
-      if (timeFilter) filters.time = timeFilter;
+      if (timeFilter) {
+        filters.time = timeFilter;
+        filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
+      }
       // Gender preference is part of the Ride model, not a filter
       if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
       if (userData?.gender) filters.userGender = userData.gender;
@@ -307,7 +315,10 @@ const Dashboard = () => {
       if (originFilter !== "all") filters.origin = originFilter;
       if (destinationFilter !== "all") filters.destination = destinationFilter;
       if (dateFilter) filters.date = dateFilter;
-      if (timeFilter) filters.time = timeFilter;
+      if (timeFilter) {
+        filters.time = timeFilter;
+        filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
+      }
       // Gender preference is part of the Ride model, not a filter
       if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
       if (userData?.gender) filters.userGender = userData.gender;
@@ -333,7 +344,10 @@ const Dashboard = () => {
       if (originFilter !== "all") filters.origin = originFilter;
       if (destinationFilter !== "all") filters.destination = destinationFilter;
       if (dateFilter) filters.date = dateFilter;
-      if (timeFilter) filters.time = timeFilter;
+      if (timeFilter) {
+        filters.time = timeFilter;
+        filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
+      }
       // Gender preference is part of the Ride model, not a filter
       if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
       if (userData?.gender) filters.userGender = userData.gender;
@@ -386,7 +400,10 @@ const Dashboard = () => {
         if (destinationFilter !== "all")
           filters.destination = destinationFilter;
         if (dateFilter) filters.date = dateFilter;
-        if (timeFilter) filters.time = timeFilter;
+        if (timeFilter) {
+          filters.time = timeFilter;
+          filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
+        }
         // Gender preference is part of the Ride model, not a filter
         if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
         if (effectiveUserData?.gender) {
@@ -495,6 +512,22 @@ const Dashboard = () => {
               placeholder="Select time"
               disablePast={dateFilter === todayYmd}
             />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 block">
+              Flexibility
+            </label>
+            <Select value={flexibleFilter} onValueChange={setFlexibleFilter} disabled={!timeFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Exact match" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="exact">Exact match</SelectItem>
+                <SelectItem value="30m">± 30 Minutes</SelectItem>
+                <SelectItem value="1h">± 1 Hour</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
