@@ -17,7 +17,6 @@ import { fetchRides, Ride, RideFilters } from "@/services/rideApi";
 import { cancelRide } from "@/services/rideApi";
 import {
   sendJoinRequest,
-  rejectRideRequest,
   cancelRideRequest,
   fetchUserRequests,
 } from "@/services/ride_requestsApi";
@@ -330,34 +329,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleRemoveParticipant = async (requestId: string) => {
-    if (!userData) {
-      toast.error("User data not available");
-      return;
-    }
 
-    try {
-      await rejectRideRequest(requestId, { leaderId: userData.id });
-      toast.info("Participant request rejected");
-      // Reload rides to show updated status
-      const filters: RideFilters = {};
-      if (originFilter !== "all") filters.origin = originFilter;
-      if (destinationFilter !== "all") filters.destination = destinationFilter;
-      if (dateFilter) filters.date = dateFilter;
-      if (timeFilter) {
-        filters.time = timeFilter;
-        filters.flexible = flexibleFilter as "exact" | "30m" | "1h";
-      }
-      // Gender preference is part of the Ride model, not a filter
-      if (seatsFilter !== "all") filters.minSeats = parseInt(seatsFilter);
-      if (userData?.gender) filters.userGender = userData.gender;
-      const ridesData = await fetchRides(filters);
-      setRides(ridesData);
-    } catch (error: any) {
-      console.error("Failed to reject participant:", error);
-      toast.error(error.message || "Failed to reject participant");
-    }
-  };
 
   const handleDeleteRide = async (rideId: string, reason?: string) => {
     if (!userData) {

@@ -1,283 +1,244 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Shield, Bell, Zap, Leaf, DollarSign, MapPin, Award, ChevronRight, ArrowRight } from "lucide-react";
-import heroImg from "@/assets/hero-carpool.jpg";
+import { useEffect, useRef } from "react";
+import "./LandingPage.css";
+import { Car, Users, Shield, Bell, DollarSign, Leaf, UsersRound, ArrowRight, Star, ChevronRight, UserCircle, MapPin, Clock } from "lucide-react";
+import heroMockup from "@/assets/hero-mockup.png";
 import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
-// Link not needed when using Clerk modal buttons
+
+/* ──────────────────────────── data ──────────────────────────── */
+
+const features = [
+  {
+    icon: Users,
+    emoji: "🤝",
+    title: "Automated Ride Matching",
+    description:
+      "Smart algorithm pairs you with compatible co-riders heading the same way, at the same time.",
+  },
+  {
+    icon: Shield,
+    emoji: "🛡️",
+    title: "Gender-Safe Groups",
+    description:
+      "Choose comfort preferences for safe rides. Ride only with people you're comfortable with.",
+  },
+  {
+    icon: Bell,
+    emoji: "🔔",
+    title: "Real-time Notifications",
+    description:
+      "Instant alerts for ride confirmations, arrivals, and schedule changes — never miss a ride.",
+  },
+];
+
+const benefits = [
+  {
+    icon: DollarSign,
+    emoji: "💰",
+    title: "Save Up to 60%",
+    description: "Cut your daily commute costs dramatically by sharing rides with others on your route.",
+  },
+  {
+    icon: Leaf,
+    emoji: "🌱",
+    title: "Reduce Carbon Footprint",
+    description: "Every shared ride removes one more car from the road. Ride green, ride together.",
+  },
+  {
+    icon: UsersRound,
+    emoji: "👥",
+    title: "Build Community",
+    description: "Connect with like-minded commuters and turn boring rides into meaningful connections.",
+  },
+];
+
+
+
+const steps = [
+  {
+    num: "01",
+    icon: UserCircle,
+    title: "Create your profile",
+    description: "Sign up in seconds and set your route, schedule, and preferences.",
+  },
+  {
+    num: "02",
+    icon: MapPin,
+    title: "Match with riders",
+    description: "Our algorithm finds the best co-riders for your commute automatically.",
+  },
+  {
+    num: "03",
+    icon: Clock,
+    title: "Ride & Save",
+    description: "Share the ride, split costs, and enjoy a smarter commute every day.",
+  },
+];
+
+const testimonials = [
+  {
+    name: "Ananya Sharma",
+    role: "Software Engineer",
+    rating: 5,
+    quote: "CabPro cut my daily commute cost by half! The matching is incredibly accurate and I feel safe every ride.",
+    avatar: "AS",
+  },
+  {
+    name: "Rahul Menon",
+    role: "Product Designer",
+    rating: 5,
+    quote: "I've been using CabPro for 6 months — it's seamless. The gender-safe groups feature is a game changer.",
+    avatar: "RM",
+  },
+  {
+    name: "Priya Patel",
+    role: "Marketing Lead",
+    rating: 4,
+    quote: "Real-time notifications keep me on track. I've never missed a shared ride since I joined CabPro.",
+    avatar: "PP",
+  },
+];
+
+/* ──────────────────────────── component ──────────────────────────── */
 
 const LandingPage = () => {
-  // Show auth buttons only when user is signed out; using Clerk's useUser for auth state
   const { isSignedIn, user } = useUser();
-  
-  const features = [
-    {
-      icon: Users,
-      title: "Automated Ride Matching",
-      description: "Our smart algorithm connects you with compatible riders on similar routes, saving time and money."
-    },
-    {
-      icon: Shield,
-      title: "Gender-Safe Groups",
-      description: "Choose your comfort level with customizable preferences for safe and secure carpooling experiences."
-    },
-    {
-      icon: Bell,
-      title: "Real-time Notifications",
-      description: "Stay updated with instant alerts about ride confirmations, driver arrivals, and schedule changes."
-    }
-  ];
-
-  const benefits = [
-    {
-      icon: DollarSign,
-      title: "Save Money",
-      description: "Cut your commute costs by up to 70% by sharing rides with others on your route.",
-      highlight: true
-    },
-    {
-      icon: Leaf,
-      title: "Reduce Emissions",
-      description: "Lower your carbon footprint and contribute to a cleaner environment with every shared ride."
-    },
-    {
-      icon: Zap,
-      title: "Save Time",
-      description: "Skip the parking hassle and use carpool lanes for faster commutes during rush hours."
-    },
-    {
-      icon: Award,
-      title: "Build Community",
-      description: "Connect with like-minded commuters and build meaningful relationships in your area."
-    },
-    {
-      icon: MapPin,
-      title: "Flexible Routes",
-      description: "Choose from multiple routes and schedules that fit perfectly with your lifestyle."
-    },
-    {
-      icon: Users,
-      title: "Verified Members",
-      description: "All riders are verified for your peace of mind and a trustworthy carpooling experience."
-    }
-  ];
-
-  const stats = [
-    { number: "50K+", label: "Active Riders" },
-    { number: "15M+", label: "Miles Shared" },
-    { number: "$12M+", label: "Saved Together" },
-    { number: "98%", label: "Satisfaction Rate" }
-  ];
-
   const navigate = useNavigate();
 
+  /* Intersection-observer driven reveal animations */
+  const revealRefs = useRef<(HTMLElement | null)[]>([]);
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add("lp-visible");
+            obs.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.15 },
+    );
+    revealRefs.current.forEach((el) => el && obs.observe(el));
+    return () => obs.disconnect();
+  }, []);
+  const addRevealRef = (el: HTMLElement | null) => {
+    if (el && !revealRefs.current.includes(el)) revealRefs.current.push(el);
+  };
+
+  /* Navigation helpers */
   const handleGetStarted = async () => {
     if (!isSignedIn) {
-      // open sign-in modal (fallback to sign-in route)
-      window.location.href = '/sign-in';
+      window.location.href = "/sign-in";
       return;
     }
-
     const email = user?.primaryEmailAddress?.emailAddress;
-    if (!email) {
-      navigate('/user-details');
-      return;
-    }
-
+    if (!email) { navigate("/user-details"); return; }
     try {
-      // Use the lightweight exists check endpoint to decide where to go
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-      const res = await fetch(`${apiBase}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`, { credentials: 'include' });
-      if (res.ok) {
-        navigate('/dashboard');
-      } else {
-        navigate('/user-details');
-      }
-    } catch (e) {
-      console.error('exists check failed', e);
-      navigate('/user-details');
+      const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5001";
+      const res = await fetch(
+        `${apiBase}/api/users/by-email?personalEmail=${encodeURIComponent(email)}`,
+        { credentials: "include" },
+      );
+      navigate(res.ok ? "/dashboard" : "/user-details");
+    } catch {
+      navigate("/user-details");
     }
   };
 
-  const handleLearnMore = () => {
-    const el = document.getElementById('Why Choose CabPro?');
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+
+
+  /* Stars helper */
+  const renderStars = (count: number) =>
+    Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`w-4 h-4 ${i < count ? "fill-amber-400 text-amber-400" : "text-gray-300"}`}
+      />
+    ));
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="border-b border-border bg-card/50 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-              CabPro
-            </h1>
-            <div className="flex items-center gap-3">
-              {
-                // Show user avatar when signed in; otherwise show modal sign in/up
-              }
-              {isSignedIn ? (
-                <UserButton
-                  appearance={{
-                    elements: {
-                      avatarBox: "w-8 h-8"
-                    }
-                  }}
-                />
-              ) : (
-                <>
-                  <SignInButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
-                    <Button variant="outline" size="sm">Sign In</Button>
-                  </SignInButton>
-                  <SignUpButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
-                    <Button size="sm">Sign Up</Button>
-                  </SignUpButton>
-                </>
-              )}
-            </div>
+    <div className="lp-root">
+      {/* ─── NAVBAR ─── */}
+      <nav className="lp-nav" id="lp-navbar">
+        <div className="lp-nav-inner">
+          <a href="/" className="lp-logo-link">
+            <Car className="lp-logo-icon" />
+            <span className="lp-logo-text">CabPro</span>
+          </a>
+          <div className="lp-nav-actions">
+            {isSignedIn ? (
+              <UserButton appearance={{ elements: { avatarBox: "w-9 h-9" } }} />
+            ) : (
+              <>
+                <SignInButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
+                  <button className="lp-btn-ghost" id="lp-signin">Sign In</button>
+                </SignInButton>
+                <SignUpButton mode="modal" fallbackRedirectUrl="/post-auth" forceRedirectUrl="/post-auth">
+                  <button className="lp-btn-pill" id="lp-signup">Sign Up</button>
+                </SignUpButton>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative py-20 md:py-32 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-cyan-500/5 to-background"></div>
-        <div className="absolute top-20 right-10 w-72 h-72 bg-blue-500 rounded-full blur-3xl opacity-10"></div>
-        <div className="absolute bottom-0 left-10 w-96 h-96 bg-cyan-500 rounded-full blur-3xl opacity-10"></div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8 text-center md:text-left">
-              <div>
-                <span className="inline-block px-4 py-2 bg-blue-500/10 text-blue-600 rounded-full text-sm font-semibold mb-4">
-                  🚀 Join the Commuting Revolution
-                </span>
-              </div>
-              <h2 className="text-5xl md:text-6xl font-bold leading-tight">
-                Carpool Smarter with{" "}
-                <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-                  CabPro
-                </span>
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-xl">
-                Save money, reduce traffic, help the planet, and build community. Join thousands of commuters making smarter travel choices every day.
-              </p>
-              <div className="flex gap-4 justify-center md:justify-start flex-wrap">
-                <Button 
-                  size="lg" 
-                  className="text-lg px-8 bg-gradient-to-r from-blue-600 to-cyan-500 hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300"
-                  onClick={handleGetStarted}
-                >
-                  Get Started <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline"
-                  className="text-lg px-8 border-2"
-                  onClick={handleLearnMore}
-                >
-                  Learn More
-                </Button>
-              </div>
-            </div>
-            <div className="relative hidden md:block">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl blur-2xl opacity-30"></div>
-              <div className="relative rounded-3xl h-96 flex items-center justify-center border border-blue-500/30 backdrop-blur overflow-hidden">
-                <img src={heroImg} alt="Carpool hero" className="w-full h-full object-cover rounded-3xl shadow-lg" />
-              </div>
+      {/* ─── HERO ─── */}
+      <section className="lp-hero" id="lp-hero">
+        {/* dot grid texture */}
+        <div className="lp-hero-dots" aria-hidden />
+        {/* gradient blobs */}
+        <div className="lp-hero-blob lp-hero-blob--1" aria-hidden />
+        <div className="lp-hero-blob lp-hero-blob--2" aria-hidden />
+
+        <div className="lp-hero-inner">
+          <div className="lp-hero-text" ref={addRevealRef}>
+            <span className="lp-hero-badge">🚀 The Smarter Way to Commute</span>
+            <h1 className="lp-hero-h1">
+              Commute Smarter.<br />
+              <span className="lp-gradient-text">Together.</span>
+            </h1>
+            <p className="lp-hero-sub">
+              Save money, cut traffic, and make your daily ride enjoyable with verified co-riders.
+            </p>
+            <div className="lp-hero-ctas">
+              <button className="lp-btn-primary" onClick={handleGetStarted} id="lp-hero-find">
+                Find a Ride <ArrowRight className="w-5 h-5" />
+              </button>
+
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Stats Section */}
-      <section className="py-12 bg-gradient-to-r from-blue-600 to-cyan-500">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-white text-center">
-            {stats.map((stat, i) => (
-              <div key={i}>
-                <p className="text-3xl md:text-4xl font-bold mb-2">{stat.number}</p>
-                <p className="text-white/80">{stat.label}</p>
-              </div>
-            ))}
+          <div className="lp-hero-visual" ref={addRevealRef}>
+            <div className="lp-hero-img-wrap">
+              <img src={heroMockup} alt="CabPro app mockup showing a map with rider matches" className="lp-hero-img" />
+            </div>
+            {/* floating stat badges */}
+            <div className="lp-float-badge lp-float-badge--1">🚗 50K+ Riders</div>
+            <div className="lp-float-badge lp-float-badge--2">🌿 12M miles shared</div>
+            <div className="lp-float-badge lp-float-badge--3">⭐ 4.9 rating</div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div id="why-choose" className="text-center mb-16">
-            <h3 className="text-4xl md:text-5xl font-bold mb-4">
-              Why Choose CabPro?
-            </h3>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Experience the future of shared transportation with features designed for your safety, convenience, and savings.
+      {/* ─── FEATURES ─── */}
+      <section className="lp-section" id="lp-features">
+        <div className="lp-container">
+          <div className="lp-section-header" ref={addRevealRef}>
+            <h2 className="lp-section-title">Why CabPro?</h2>
+            <p className="lp-section-sub">
+              Built from the ground up for safe, smart, and social commuting.
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8">
-                {features.map((feature, index) => {
-              const Icon = feature.icon;
+          <div className="lp-features-grid">
+            {features.map((f, i) => {
+              const Icon = f.icon;
               return (
-                <Card 
-                  key={index}
-                  className={`border-2 transition-all duration-300 hover:shadow-xl group cursor-pointer ${
-                    (feature as any).highlight 
-                      ? 'border-blue-500/50 bg-gradient-to-br from-blue-50 to-cyan-50' 
-                      : 'border-border hover:border-blue-500/30'
-                  }`}
-                >
-                  <CardHeader>
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 ${
-                      (feature as any).highlight
-                        ? 'bg-gradient-to-br from-blue-600 to-cyan-500'
-                        : 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20'
-                    }`}>
-                      <Icon className={`w-7 h-7 ${(feature as any).highlight ? 'text-white' : 'text-blue-600'}`} />
-                    </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-base leading-relaxed">
-                      {feature.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="py-20 bg-muted/40">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h3 className="text-4xl md:text-5xl font-bold mb-4">
-              Benefits That Matter
-            </h3>
-            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Discover how CabPro transforms your daily commute in multiple ways
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {benefits.map((benefit, i) => {
-              const Icon = benefit.icon;
-              return (
-                <div 
-                  key={i}
-                  className="p-6 rounded-2xl bg-white border border-border hover:border-blue-500/30 hover:shadow-lg transition-all duration-300 group"
-                >
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform ${
-                    benefit.highlight
-                      ? 'bg-gradient-to-br from-blue-600 to-cyan-500'
-                      : 'bg-blue-500/10'
-                  }`}>
-                    <Icon className={`w-6 h-6 ${benefit.highlight ? 'text-white' : 'text-blue-600'}`} />
+                <div key={i} className="lp-feature-card" ref={addRevealRef}>
+                  <div className="lp-feature-icon-box">
+                    <Icon className="lp-feature-icon" />
                   </div>
-                  <h4 className="text-lg font-bold mb-2">{benefit.title}</h4>
-                  <p className="text-muted-foreground">{benefit.description}</p>
+                  <h3 className="lp-feature-title">{f.emoji} {f.title}</h3>
+                  <p className="lp-feature-desc">{f.description}</p>
                 </div>
               );
             })}
@@ -285,79 +246,144 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <Card className="border-2 border-blue-500/30 bg-gradient-to-r from-blue-600/5 to-cyan-500/5 shadow-xl">
-            <CardHeader className="text-center pb-8">
-              <CardTitle className="text-4xl md:text-5xl mb-4 bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
-                Ready to Transform Your Commute?
-              </CardTitle>
-              <CardDescription className="text-lg">
-                Join thousands of commuters saving time, money, and the planet every single day.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col sm:flex-row justify-center gap-4 pb-8">
-              <Button size="lg" className="text-lg px-12 bg-gradient-to-r from-blue-600 to-cyan-500 hover:shadow-lg" onClick={handleGetStarted}>
-                Get Started Now <ChevronRight className="ml-2 w-5 h-5" />
-              </Button>
-            </CardContent>
-          </Card>
+      {/* ─── BENEFITS ─── */}
+      <section className="lp-section lp-section--alt" id="lp-benefits">
+        <div className="lp-container">
+          <div className="lp-section-header" ref={addRevealRef}>
+            <h2 className="lp-section-title">Benefits That Matter</h2>
+            <p className="lp-section-sub">
+              More than just a ride — it's a smarter lifestyle.
+            </p>
+          </div>
+          <div className="lp-features-grid">
+            {benefits.map((b, i) => {
+              const Icon = b.icon;
+              return (
+                <div key={i} className="lp-feature-card" ref={addRevealRef}>
+                  <div className="lp-feature-icon-box lp-feature-icon-box--teal">
+                    <Icon className="lp-feature-icon" />
+                  </div>
+                  <h3 className="lp-feature-title">{b.emoji} {b.title}</h3>
+                  <p className="lp-feature-desc">{b.description}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50 backdrop-blur">
-        <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-4 gap-8 py-12">
-            <div className="md:col-span-1">
-              <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent mb-4">
-                CabPro
-              </h3>
-              <p className="text-sm text-muted-foreground">
+      {/* ─── HOW IT WORKS ─── */}
+      <section className="lp-section" id="lp-how">
+        <div className="lp-container">
+          <div className="lp-section-header" ref={addRevealRef}>
+            <h2 className="lp-section-title">How It Works</h2>
+            <p className="lp-section-sub">Three simple steps to a better commute.</p>
+          </div>
+          <div className="lp-steps-grid">
+            {steps.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={i} className="lp-step-card" ref={addRevealRef}>
+                  <span className="lp-step-num">{s.num}</span>
+                  <div className="lp-step-icon-wrap">
+                    <Icon className="lp-step-icon" />
+                  </div>
+                  <h3 className="lp-step-title">{s.title}</h3>
+                  <p className="lp-step-desc">{s.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── TESTIMONIALS ─── */}
+      <section className="lp-section lp-section--alt" id="lp-testimonials">
+        <div className="lp-container">
+          <div className="lp-section-header" ref={addRevealRef}>
+            <h2 className="lp-section-title">What Riders Say</h2>
+            <p className="lp-section-sub">
+              Join thousands of happy commuters already on CabPro.
+            </p>
+          </div>
+          <div className="lp-testimonials-grid">
+            {testimonials.map((t, i) => (
+              <div key={i} className="lp-testimonial-card" ref={addRevealRef}>
+                <div className="lp-testimonial-top">
+                  <div className="lp-testimonial-avatar">{t.avatar}</div>
+                  <div>
+                    <p className="lp-testimonial-name">{t.name}</p>
+                    <p className="lp-testimonial-role">{t.role}</p>
+                  </div>
+                </div>
+                <div className="lp-testimonial-stars">{renderStars(t.rating)}</div>
+                <p className="lp-testimonial-quote">&ldquo;{t.quote}&rdquo;</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── CTA BANNER ─── */}
+      <section className="lp-cta-banner" id="lp-cta" ref={addRevealRef}>
+        <div className="lp-container lp-cta-inner">
+          <h2 className="lp-cta-title">Ready to Transform Your Commute?</h2>
+          <p className="lp-cta-sub">
+            Join 50,000+ riders saving time, money, and the planet every single day.
+          </p>
+          <button className="lp-cta-btn" onClick={handleGetStarted} id="lp-cta-start">
+            Get Started Now <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </section>
+
+      {/* ─── FOOTER ─── */}
+      <footer className="lp-footer" id="lp-footer">
+        <div className="lp-container">
+          <div className="lp-footer-grid">
+            <div className="lp-footer-brand">
+              <div className="lp-logo-link" style={{color:"#fff"}}>
+                <Car className="lp-logo-icon" style={{color:"#c084fc"}} />
+                <span className="lp-logo-text" style={{color:"#ffffff"}}>CabPro</span>
+              </div>
+              <p className="lp-footer-tagline">
                 Making commutes smarter, cheaper, and more sustainable for everyone.
               </p>
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition">Features</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Pricing</a></li>
-                <li><a href="#" className="hover:text-foreground transition">How It Works</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Safety</a></li>
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-heading">Product</h4>
+              <ul className="lp-footer-links">
+                <li><a href="#">Features</a></li>
+                <li><a href="#">Pricing</a></li>
+                <li><a href="#">How It Works</a></li>
+                <li><a href="#">Safety</a></li>
               </ul>
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition">About Us</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Contact</a></li>
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-heading">Company</h4>
+              <ul className="lp-footer-links">
+                <li><a href="#">About Us</a></li>
+                <li><a href="#">Blog</a></li>
+                <li><a href="#">Careers</a></li>
+                <li><a href="#">Contact</a></li>
               </ul>
             </div>
-            
-            <div>
-              <h4 className="font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Cookie Policy</a></li>
-                <li><a href="#" className="hover:text-foreground transition">Trust & Safety</a></li>
+            <div className="lp-footer-col">
+              <h4 className="lp-footer-heading">Legal</h4>
+              <ul className="lp-footer-links">
+                <li><a href="#">Privacy Policy</a></li>
+                <li><a href="#">Terms of Service</a></li>
+                <li><a href="#">Cookie Policy</a></li>
+                <li><a href="#">Trust & Safety</a></li>
               </ul>
             </div>
           </div>
-          
-          <div className="border-t border-border py-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-              <p>&copy; 2024 CabPro. All rights reserved.</p>
-              <div className="flex gap-6">
-                <a href="#" className="hover:text-foreground transition">Twitter</a>
-                <a href="#" className="hover:text-foreground transition">LinkedIn</a>
-                <a href="#" className="hover:text-foreground transition">Facebook</a>
-              </div>
+          <div className="lp-footer-bottom">
+            <p>&copy; {new Date().getFullYear()} CabPro. All rights reserved.</p>
+            <div className="lp-footer-social">
+              <a href="#">Twitter</a>
+              <a href="#">LinkedIn</a>
+              <a href="#">Instagram</a>
             </div>
           </div>
         </div>
