@@ -1,4 +1,5 @@
 import express from "express";
+import nodemailer from "nodemailer";
 import cors from "cors";
 import userRouter from "./routes/user.routes.js";
 import reviewRouter from "./routes/review.routes.js";
@@ -40,6 +41,48 @@ app.use("/api/reviews", reviewRouter);
 app.use("/api/rides", rideRouter);
 app.use("/api/ride-requests", rideRequestsRouter);
 app.use("/api/history", historyRouter);
+
+// Test email endpoint
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: process.env.SMTP_PORT || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"CabPro Test" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER,
+      subject: "Test Email from Render",
+      text: "If you are reading this, the deployed mail service is working!",
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: "Test email sent successfully", 
+      messageId: info.messageId,
+      env: {
+        user: process.env.EMAIL_USER ? "Set" : "Not Set",
+        pass: process.env.EMAIL_PASS ? "Set" : "Not Set"
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: error.message, 
+      stack: error.stack,
+      env: {
+        user: process.env.EMAIL_USER ? "Set" : "Not Set",
+        pass: process.env.EMAIL_PASS ? "Set" : "Not Set"
+      }
+    });
+  }
+});
 
 // Initialize DB connection on import
 connectDB();
