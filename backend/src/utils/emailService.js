@@ -63,7 +63,7 @@ export const sendJoinRequestEmail = async (
         
         <div style="text-align: center; margin: 30px 0;">
           <p style="color: #666;">Please log in to your CabPro account to accept or reject this request.</p>
-          <a href="${process.env.FRONTEND_URL || "http://localhost:5173"}/dashboard" 
+          <a href="https://cab-pro.vercel.app/dashboard" 
              style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
             View Requests
           </a>
@@ -132,9 +132,21 @@ export const sendRideStatusEmail = async (
           <div style="text-align: center; margin: 30px 0;">
             <p style="color: #4CAF50; font-weight: bold;">🎉 Get ready for your ride!</p>
             <p>Please arrive at the pickup point on time.</p>
+            <a href="https://cab-pro.vercel.app/dashboard" 
+               style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 15px;">
+              View Dashboard
+            </a>
           </div>
         `
-            : ""
+            : `
+          <div style="text-align: center; margin: 30px 0;">
+             <p style="color: #666;">View other available rides on Dashboard.</p>
+             <a href="https://cab-pro.vercel.app/dashboard" 
+               style="background-color: #f44336; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 15px;">
+              View Dashboard
+            </a>
+          </div>
+        `
         }
         
         <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px;">
@@ -159,3 +171,74 @@ export const sendRideStatusEmail = async (
     throw error;
   }
 };
+
+export const sendLeaderConfirmationEmail = async (
+  leaderEmail,
+  leaderName,
+  participantName,
+  participantPhone,
+  participantEmail,
+  rideDetails,
+) => {
+  try {
+    const transporter = createTransporter();
+    if (!transporter) {
+      console.warn("Email transporter not configured. Skipping email.");
+      return;
+    }
+
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">
+          ✅ Ride Request Accepted
+        </h2>
+        
+        <p>Dear <strong>${leaderName}</strong>,</p>
+        
+        <p>You have successfully accepted the ride request from <strong>${participantName}</strong>.</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">👤 Participant Contact Info</h3>
+          <p><strong>Name:</strong> ${participantName}</p>
+          <p><strong>Email:</strong> ${participantEmail}</p>
+          <p><strong>WhatsApp / Phone:</strong> ${participantPhone || "Not provided"}</p>
+        </div>
+        
+        <div style="background-color: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #333; margin-top: 0;">🚙 Ride Details</h3>
+          <p><strong>From:</strong> ${rideDetails.origin}</p>
+          <p><strong>To:</strong> ${rideDetails.destination}</p>
+          <p><strong>Date:</strong> ${new Date(rideDetails.rideDate).toLocaleDateString()}</p>
+          <p><strong>Time:</strong> ${rideDetails.rideTime}</p>
+        </div>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="https://cab-pro.vercel.app/dashboard" 
+             style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+            Go to Dashboard
+          </a>
+        </div>
+        
+        <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px;">
+          <p style="color: #666; font-size: 14px;">
+            This is an automated notification from CabPro. Please do not reply to this email.
+          </p>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"CabPro" <${process.env.EMAIL_USER}>`,
+      to: leaderEmail,
+      subject: `✅ Ride Joined: ${participantName} is joining your ride`,
+      html: emailContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log("Leader confirmation email sent successfully to:", leaderEmail);
+  } catch (error) {
+    console.error("Error sending leader confirmation email:", error);
+    throw error;
+  }
+};
+

@@ -2,7 +2,7 @@ import { db } from "../../Database/database.js";
 import rideRequests from "../models/ride_requests.model.js";
 import rides from "../models/ride.model.js";
 import users from "../models/user.model.js";
-import { sendJoinRequestEmail } from "../utils/emailService.js";
+import { sendJoinRequestEmail, sendRideStatusEmail, sendLeaderConfirmationEmail } from "../utils/emailService.js";
 import {
   emitRequestSent,
   emitRequestAccepted,
@@ -76,20 +76,17 @@ export const sendJoinRequest = async (req, res) => {
       rideDetails: ride[0],
     });
 
-    // Send email notification to ride leader
-    try {
-      await sendJoinRequestEmail(
-        leader[0].personalEmail,
-        leader[0].fullName,
-        participant[0].fullName,
-        participant[0].averageRating || 0,
-        participant[0].totalReviews || 0,
-        ride[0],
-      );
-    } catch (emailError) {
+    // Send email notification to ride leader asynchronously
+    sendJoinRequestEmail(
+      leader[0].personalEmail,
+      leader[0].fullName,
+      participant[0].fullName,
+      participant[0].averageRating || 0,
+      participant[0].totalReviews || 0,
+      ride[0],
+    ).catch((emailError) => {
       console.error("Failed to send email notification:", emailError);
-      // Don't fail the request if email fails, just log it
-    }
+    });
 
     res.status(201).json({ message: "Join request sent successfully" });
   } catch (error) {
@@ -107,7 +104,7 @@ export const acceptRequest = async (req, res) => {
   const { leaderId } = req.body; // send leaderId from frontend
 
   try {
-    await db.transaction(async (tx) => {
+    const { acceptedUser, rideLeader, rideInfo } = await db.transaction(async (tx) => {
       const request = await tx
         .select()
         .from(rideRequests)
@@ -133,6 +130,7 @@ export const acceptRequest = async (req, res) => {
       if (ride[0].availableSeats <= 0) {
         throw new Error("No seats available");
       }
+      
       // 🔥 Fetch user gender
       const user = await tx
         .select()
@@ -140,6 +138,11 @@ export const acceptRequest = async (req, res) => {
         .where(eq(users.id, request[0].userId));
 
       if (!user.length) throw new Error("User not found");
+
+      const leader = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, leaderId));
 
       const userGender = user[0].gender;
 
@@ -188,7 +191,28 @@ export const acceptRequest = async (req, res) => {
         averageRating: user[0].averageRating,
         totalReviews: user[0].totalReviews,
       });
+
+      return { acceptedUser: user[0], rideLeader: leader[0] || null, rideInfo: ride[0] };
     });
+
+    // Send emails asynchronously
+    sendRideStatusEmail(
+      acceptedUser.personalEmail,
+      acceptedUser.fullName,
+      "ACCEPTED",
+      rideInfo
+    ).catch((err) => console.error("Failed to send accepted email:", err));
+
+    if (rideLeader) {
+      sendLeaderConfirmationEmail(
+        rideLeader.personalEmail,
+        rideLeader.fullName,
+        acceptedUser.fullName,
+        acceptedUser.whatsappNumber,
+        acceptedUser.personalEmail,
+        rideInfo
+      ).catch((err) => console.error("Failed to send leader confirmation email:", err));
+    }
 
     res.status(200).json({ message: "Request accepted" });
   } catch (error) {
@@ -202,7 +226,7 @@ export const rejectRequest = async (req, res) => {
   const { leaderId, rejectionReason } = req.body;
 
   try {
-    await db.transaction(async (tx) => {
+    const { rejectedUser, rideInfo } = await db.transaction(async (tx) => {
       const request = await tx
         .select()
         .from(rideRequests)
@@ -222,6 +246,11 @@ export const rejectRequest = async (req, res) => {
         throw new Error("Only ride leader can reject requests");
       }
 
+      const user = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, request[0].userId));
+
       await tx
         .update(rideRequests)
         .set({
@@ -240,7 +269,18 @@ export const rejectRequest = async (req, res) => {
         status: "REJECTED",
         rejectionReason: rejectionReason || null,
       });
+
+      return { rejectedUser: user[0], rideInfo: ride[0] };
     });
+
+    if (rejectedUser) {
+      sendRideStatusEmail(
+        rejectedUser.personalEmail,
+        rejectedUser.fullName,
+        "REJECTED",
+        rideInfo
+      ).catch((err) => console.error("Failed to send rejected email:", err));
+    }
 
     res.status(200).json({ message: "Request rejected" });
   } catch (error) {
